@@ -12,7 +12,7 @@ Seven XCTest cases pass, covering more than 30,000 on-screen poses, rotated artw
 
 The native app was launched and its named overlay window and rendered running whippet were inspected through native computer-use screenshots. Both supplied whippet videos were accessible as motion references; no video assets were copied. The original drawing uses gathered/extended poses and paired-leg motion.
 
-The implementation uses a non-key, non-main panel with `ignoresMouseEvents = true`, a floating window level, native menu items, and system Reduce Motion detection. No screen-reading or accessibility API is used by the app. Pause freezes the parent layer's clock; rest removes its animations. The only recurring behavior is a single rest timer between laps.
+The implementation uses a non-key, non-main panel with `ignoresMouseEvents = true`, a floating window level, native menu items, and system Reduce Motion detection. The app does not inspect other windows or request screen-recording or Accessibility permissions. Pause freezes the parent layer's clock; rest removes its animations. The only recurring behavior is a single rest timer between laps.
 
 ## Coverage limits
 
