@@ -11,6 +11,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--render-art"), CommandLine
         application.setActivationPolicy(.accessory)
         let delegate = AppDelegate()
         application.delegate = delegate
-        application.run()
+        // NSApplication's delegate is weak; retain the owner of the pet and
+        // status item for the whole event loop, including quiet rest periods.
+        withExtendedLifetime(delegate) { application.run() }
     }
 }
