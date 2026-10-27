@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+dist/
+dist.nosync/
+.DS_Store
+*.xcuserstate
+evidence/
