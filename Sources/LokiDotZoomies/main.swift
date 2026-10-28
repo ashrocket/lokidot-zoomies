@@ -1,9 +1,14 @@
 import AppKit
 
-if let index = CommandLine.arguments.firstIndex(of: "--render-art"), CommandLine.arguments.count > index + 1 {
-    let representation = NSBitmapImageRep(cgImage: PetArtwork.image(scale: 4))
-    if let data = representation.representation(using: .png, properties: [:]) {
-        try data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+if let index = CommandLine.arguments.firstIndex(of: "--render-preview"), CommandLine.arguments.count > index + 1 {
+    do {
+        guard let url = SpriteArtwork.initialURL() else { throw SpriteArtwork.Error.missing }
+        let artwork = try SpriteArtwork(url: url)
+        try artwork.writePreviews(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+        print("Exported original left/right frames; 8 frames per direction, 0.08 seconds per frame.")
+    } catch {
+        fputs("\(error.localizedDescription)\n", stderr)
+        exit(1)
     }
 } else {
     MainActor.assumeIsolated {

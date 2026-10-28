@@ -12,7 +12,7 @@ public struct MotionSample {
 public struct MotionRoute {
     public static let lapDuration: TimeInterval = 16
     public static let restDuration: TimeInterval = 24
-    public static let artworkSize = CGSize(width: 144, height: 108)
+    public static let artworkSize = CGSize(width: 144, height: 156)
 
     public let safeBounds: CGRect
     public let spriteSize: CGSize

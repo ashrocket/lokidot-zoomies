@@ -1,23 +1,23 @@
 # Verification
 
-The initial release was built on Apple Silicon with Xcode 26.6 / Swift 6.3.3 and a macOS 13 deployment target.
+Version 1.1 replaces the procedural substitute with playback of the owner's existing atlas. The original downloaded PNG remains outside public Git. Its visible eight-frame left/right running rows and six-frame idle row were inspected before integration. No live inspection of the Dot application was performed because the computer-use tool disallows that app.
 
-## Automated checks
+## Automated coverage
 
-Seven XCTest cases pass, covering more than 30,000 on-screen poses, rotated artwork bounds across five display geometries, continuous start/end tangents, left-first choreography, arc-length pacing, smooth heading changes, monotonic easing, and invalid progress.
+Eleven XCTest cases cover more than 30,000 sampled poses across ordinary, portrait, tiny, and offset display geometries; the taller 144 × 156 artwork bounds; route closure and continuous heading; left-first choreography; arc-length pacing; smooth easing; invalid progress; atlas row order; exact authored frame counts; invalid image dimensions; and cell boundaries.
 
-`scripts/test.sh` uses the installed XCTest frameworks and returns a failing exit code for any failing assertion or an empty test suite. `swift test` is an alternative outside environments that disallow nested package-manifest sandboxes.
+`scripts/test.sh` uses installed XCTest frameworks and fails for a failing assertion or empty suite. The build uses the installed Swift compiler and verifies the resulting ad-hoc code signature. The target is macOS 13, with native architecture selected at build time.
 
-## Runtime and visual checks
+## Observed result
 
-The native app was launched and its named overlay window and rendered running whippet were inspected through native computer-use screenshots. Both supplied whippet videos were accessible as motion references; no video assets were copied. The original drawing uses gathered/extended poses and paired-leg motion.
+The corrected build compiled successfully, passed all eleven tests, and passed strict code-signature verification. The original atlas bytes in the local bundle match the downloaded source. Native screenshots showed the actual robot-whippet sprite at different positions and running poses on the route, and Activity Monitor confirmed the app process.
 
-The implementation uses a non-key, non-main panel with `ignoresMouseEvents = true`, a floating window level, native menu items, and system Reduce Motion detection. The app does not inspect other windows or request screen-recording or Accessibility permissions. Pause freezes the parent layer's clock; rest removes its animations. The only recurring behavior is a single rest timer between laps.
+## Runtime design
+
+The panel cannot become key or main and has `ignoresMouseEvents = true`. Pause freezes its parent layer clock. Rest and Reduce Motion remove animations. Menus keep their item identities while animation state changes, and Quit has no keyboard shortcut. The application delegate is retained for the whole event loop, and closing an overlay window does not terminate the menu-bar app.
+
+An earlier instrumented desktop run completed two laps and then logged the explicit Quit action followed by normal termination. That was not evidence of a spontaneous animation crash; the source of the Quit input was unknown. No attempt is made to override a user choosing Quit.
 
 ## Coverage limits
 
-Physical multi-display hot-plug, VoiceOver interaction, the complete appearance/contrast matrix, and Instruments frame-time measurements have not been verified. Synthetic display geometries are covered by the tests. No measured frame-rate or energy-use claim is made. The macOS 13 minimum is a compile target; the app has not been run on every supported OS version or an Intel Mac.
-
-A SwiftUI-oriented static scanner flagged the AppKit Reduce Motion API and the read-only `animation(forKey:)` diagnostic call. Both are scanner mismatches: this app uses `NSWorkspace.accessibilityDisplayShouldReduceMotion`, and its animation groups are explicit Core Animation objects.
-
-The expressive profile applies to the mascot only; controls use ordinary AppKit menus. Provisional native-interface rubric: platform 13/15, layout 13/15, semantics 14/15, interaction 17/20, motion 13/15, accessibility 7/10, implementation 7/10 (84/100). This is capped by the unverified assistive-technology and performance coverage, not a claim of Apple endorsement.
+The original Dot application's live playback timing cannot be compared through the available UI tool. This app preserves the supplied frames and uses an explicit 80 ms frame interval. Physical multi-display hot-plug, VoiceOver interaction, the full appearance/contrast matrix, Intel execution, every supported macOS version, and Instruments frame-time measurements remain unverified. No sustained FPS or energy-use claim is made.

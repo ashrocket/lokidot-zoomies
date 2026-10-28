@@ -1,16 +1,23 @@
 import AppKit
 import QuartzCore
+import UniformTypeIdentifiers
 import ZoomiesCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnimationDelegate {
-    enum Mode: String { case running, resting, pausedRun, pausedRest, reducedMotion }
+    enum Mode: String { case running, resting, pausedRun, pausedRest, reducedMotion, needsArtwork }
     private var mode: Mode = .resting
     private var repeatEnabled = true
     private var overlay: Overlay?
+    private var artwork: SpriteArtwork?
     private var selectedDisplay: CGDirectDisplayID?
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
+    private var statusLabel: NSMenuItem!
+    private var zoomiesItem: NSMenuItem!
+    private var pauseItem: NSMenuItem!
+    private var repeatItem: NSMenuItem!
+    private var displayItem: NSMenuItem!
     private var restTimer: Timer?
     private var restDeadline: TimeInterval?
     private var restRemaining = MotionRoute.restDuration
@@ -34,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         statusItem.button?.setAccessibilityLabel("LokiDot Zoomies")
         statusItem.menu = menu
         menu.delegate = self
+        buildMenu()
+        if let url = SpriteArtwork.initialURL() { artwork = try? SpriteArtwork(url: url) }
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(displaysChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         let workspace = NSWorkspace.shared.notificationCenter
@@ -48,12 +57,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated { self?.writeDiagnostics(to: url) }
+                Task { @MainActor in self?.writeDiagnostics(to: url) }
             }
         }
     }
 
     private func configureDisplay() {
+        guard let artwork else { mode = .needsArtwork; updateMenu(); return }
         let screens = NSScreen.screens
         guard let screen = screens.first(where: { displayID($0) == selectedDisplay })
             ?? screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
@@ -65,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         overlay?.settle()
         overlay?.window.close()
         selectedDisplay = displayID(screen)
-        overlay = Overlay(screen: screen)
+        overlay = Overlay(screen: screen, artwork: artwork)
+        rebuildDisplayMenu()
         overlay?.window.orderFrontRegardless()
         if reducedMotion { mode = .reducedMotion }
         else if wasPaused { mode = .pausedRest }
@@ -74,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     private func startLap() {
+        guard artwork != nil else { mode = .needsArtwork; updateMenu(); return }
         guard !reducedMotion else { mode = .reducedMotion; updateMenu(); return }
         restTimer?.invalidate()
         restTimer = nil
@@ -101,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         restRemaining = seconds
         restDeadline = ProcessInfo.processInfo.systemUptime + seconds
         restTimer = Timer.scheduledTimer(withTimeInterval: max(0.1, seconds), repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 guard let self, self.mode == .resting, self.repeatEnabled else { return }
                 self.startLap()
             }
@@ -113,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         switch mode {
         case .pausedRun: togglePause()
         case .resting, .pausedRest: startLap()
-        case .running, .reducedMotion: break
+        case .running, .reducedMotion, .needsArtwork: break
         }
     }
 
@@ -133,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         case .pausedRest:
             mode = .resting
             if repeatEnabled { scheduleRest(seconds: restRemaining) }
-        case .reducedMotion: break
+        case .reducedMotion, .needsArtwork: break
         }
         updateMenu()
     }
@@ -155,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     @objc private func displaysChanged() { configureDisplay() }
 
     @objc private func accessibilityChanged() {
+        guard artwork != nil else { return }
         if reducedMotion {
             restTimer?.invalidate()
             restTimer = nil
@@ -185,6 +198,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     @objc private func quit() { NSApp.terminate(nil) }
 
+    @objc private func chooseArtwork() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Loki Artwork"
+        panel.message = "Choose your local pet sprite sheet. It stays on this Mac."
+        panel.allowedContentTypes = [.png]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            artwork = try SpriteArtwork(url: url)
+            configureDisplay()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Artwork could not be loaded"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
     func applicationWillTerminate(_ notification: Notification) {
         restTimer?.invalidate()
         overlay?.window.close()
@@ -192,26 +226,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     func menuWillOpen(_ menu: NSMenu) { updateMenu() }
 
+    private func buildMenu() {
+        menu.autoenablesItems = false
+        statusLabel = NSMenuItem(title: "LokiDot Zoomies", action: nil, keyEquivalent: "")
+        statusLabel.isEnabled = false
+        menu.addItem(statusLabel)
+        menu.addItem(.separator())
+        zoomiesItem = add("Zoomies!", action: #selector(zoomies), key: "z")
+        pauseItem = add("Pause", action: #selector(togglePause), key: "p")
+        repeatItem = add("Repeat gently", action: #selector(toggleRepeat), key: "r")
+        menu.addItem(.separator())
+        displayItem = NSMenuItem(title: "Display", action: nil, keyEquivalent: "")
+        menu.addItem(displayItem)
+        add("Choose Loki Artwork…", action: #selector(chooseArtwork), key: "")
+        menu.addItem(.separator())
+        // A background pet should not consume Command-Q intended for another app.
+        add("Quit LokiDot Zoomies", action: #selector(quit), key: "")
+        rebuildDisplayMenu()
+    }
+
     private func updateMenu() {
-        guard statusItem != nil else { return }
-        menu.removeAllItems()
+        guard statusLabel != nil else { return }
         let status: String
         switch mode {
         case .running: status = "LokiDot is doing zoomies"
         case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "LokiDot is resting"
         case .pausedRun, .pausedRest: status = "LokiDot is paused"
         case .reducedMotion: status = "Resting · Reduce Motion is on"
+        case .needsArtwork: status = "Choose Loki Artwork to begin"
         }
-        let label = NSMenuItem(title: status, action: nil, keyEquivalent: "")
-        label.isEnabled = false
-        menu.addItem(label)
-        menu.addItem(.separator())
-        add("Zoomies!", action: #selector(zoomies), key: "z", enabled: mode != .reducedMotion && mode != .running)
+        // Keep menu item identities and positions stable while tracking a menu.
+        statusLabel.title = status
+        zoomiesItem.isEnabled = mode != .needsArtwork && mode != .reducedMotion && mode != .running
         let paused = mode == .pausedRun || mode == .pausedRest
-        add(paused ? "Resume" : "Pause", action: #selector(togglePause), key: "p", enabled: mode != .reducedMotion)
-        let repeatItem = add("Repeat gently", action: #selector(toggleRepeat), key: "r")
+        pauseItem.title = paused ? "Resume" : "Pause"
+        pauseItem.isEnabled = mode != .needsArtwork && mode != .reducedMotion
+        repeatItem.isEnabled = mode != .needsArtwork
         repeatItem.state = repeatEnabled ? .on : .off
-        menu.addItem(.separator())
+        statusItem.button?.toolTip = "LokiDot Zoomies — \(status)"
+    }
+
+    private func rebuildDisplayMenu() {
         let displays = NSMenu()
         for (index, screen) in NSScreen.screens.enumerated() {
             let item = NSMenuItem(title: "\(screen.localizedName) (\(index + 1))", action: #selector(selectDisplay(_:)), keyEquivalent: "")
@@ -220,12 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             item.state = displayID(screen) == selectedDisplay ? .on : .off
             displays.addItem(item)
         }
-        let displayItem = NSMenuItem(title: "Display", action: nil, keyEquivalent: "")
         displayItem.submenu = displays
-        menu.addItem(displayItem)
-        menu.addItem(.separator())
-        add("Quit LokiDot Zoomies", action: #selector(quit), key: "q")
-        statusItem.button?.toolTip = "LokiDot Zoomies — \(status)"
     }
 
     @discardableResult
