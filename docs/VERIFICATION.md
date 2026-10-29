@@ -1,23 +1,33 @@
 # Verification
 
-Version 1.1 replaces the procedural substitute with playback of the owner's existing atlas. The original downloaded PNG remains outside public Git. Its visible eight-frame left/right running rows and six-frame idle row were inspected before integration. No live inspection of the Dot application was performed because the computer-use tool disallows that app.
+Version 1.2 adds a common SpritePack loader used by the standalone CLI, app importer, and build gate. It supports a flexible three-state Zoomies pack and the complete pet-v2 atlas. Unknown fields, executable hooks, URLs, path traversal, symlinks, nonregular files, corrupt or truncated PNG containers, invalid checksums, empty frames, opaque backgrounds, oversized data, bad grids, overlaps, and missing states are rejected.
 
-## Automated coverage
+## Automated checks
 
-Eleven XCTest cases cover more than 30,000 sampled poses across ordinary, portrait, tiny, and offset display geometries; the taller 144 × 156 artwork bounds; route closure and continuous heading; left-first choreography; arc-length pacing; smooth easing; invalid progress; atlas row order; exact authored frame counts; invalid image dimensions; and cell boundaries.
+**25 XCTest cases passed with zero failures** on an Apple Silicon Mac using the installed Swift compiler. Tests generate synthetic image data and cover:
 
-`scripts/test.sh` uses installed XCTest frameworks and fails for a failing assertion or empty suite. The build uses the installed Swift compiler and verifies the resulting ad-hoc code signature. The target is macOS 13, with native architecture selected at build time.
+- Route bounds, closure, heading, pacing, invalid progress, and multiple display geometries.
+- Wide and tall custom artwork, plus three staggered route phases without discontinuities.
+- Complete native packs with different direction counts and rates; canonical packaging and round-trip loading.
+- Complete v2 packs with all 73 poses, required state/count mappings, and transparent unused cells.
+- The malformed, incomplete, corrupt, and unsafe inputs listed above.
 
-## Observed result
+## Build and CLI integration
 
-The corrected build compiled successfully, passed all eleven tests, and passed strict code-signature verification. The original atlas bytes in the local bundle match the downloaded source. Native screenshots showed the actual robot-whippet sprite at different positions and running poses on the route, and Activity Monitor confirmed the app process.
+All three ready default packs, Robot Loki, Beagle, and Whippet, passed the actual standalone validator.
 
-## Runtime design
+The validator returned exit 0 for a complete synthetic pack and exit 1 with an actionable missing-direction error for an incomplete pack. The same incomplete pack failed the build gate and left the existing archive and app-path file unchanged.
 
-The panel cannot become key or main and has `ignoresMouseEvents = true`. Pause freezes its parent layer clock. Rest and Reduce Motion remove animations. Menus keep their item identities while animation state changes, and Quit has no keyboard shortcut. The application delegate is retained for the whole event loop, and closing an overlay window does not terminate the menu-bar app.
+A customized Sample app compiled successfully, used its declared display name and bundle id, contained only the normalized manifest and PNG from the input folder, passed strict code-signature verification, and exported three GIF previews without opening a desktop window. Unrelated input files were not bundled.
 
-An earlier instrumented desktop run completed two laps and then logged the explicit Quit action followed by normal termination. That was not evidence of a spontaneous animation crash; the source of the Quit input was unknown. No attempt is made to override a user choosing Quit.
+The default app compiled successfully, packaged all three ready characters, and passed strict code-signature verification. The build operates in a new staging directory and does not replace or quit a running app.
 
-## Coverage limits
+## Runtime behavior and limits
 
-The original Dot application's live playback timing cannot be compared through the available UI tool. This app preserves the supplied frames and uses an explicit 80 ms frame interval. Physical multi-display hot-plug, VoiceOver interaction, the full appearance/contrast matrix, Intel execution, every supported macOS version, and Instruments frame-time measurements remain unverified. No sustained FPS or energy-use claim is made.
+The version 1.2 app was opened with --all-ready on the connected Apple Silicon Mac. Its own diagnostics reported three characters, a visible click-through window, an active lap animation, and gentle repeat enabled. Native window captures taken at different times showed Loki, Beagle, and Whippet together, with changed positions and running poses, followed by their resting poses. The app was left running. Individual menu interactions still require separate desktop verification.
+
+All ready characters share one click-through panel and one Core Animation clock. Only one animation-completion callback schedules the group's rest timer. Character selection and imported folder choices are stored locally. No current Dot-avatar state is changed.
+
+The structural validator cannot prove artistic identity, gait quality, correct gaze, or smooth semantic transitions. Beagle's visual-review notes about approximate intermediate gazes and two direction transitions are retained in ARTWORK.md. In-place circling and prancing-hop playback are planned follow-up work and are not implemented.
+
+Physical multi-display hot-plug, VoiceOver interaction, Intel execution, every supported macOS version, individual menu interactions, and Instruments frame-time or energy measurements remain unverified. No sustained FPS, memory, or energy-use claim is made.

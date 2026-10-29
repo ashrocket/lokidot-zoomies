@@ -1,13 +1,22 @@
 #!/bin/bash
 set -euo pipefail
+PACK=""
+if [[ $# -ne 0 ]]; then
+  if [[ $# -ne 2 || "$1" != "--pack" ]]; then
+    echo "Usage: ./scripts/build.sh [--pack /path/to/pack-folder]" >&2
+    exit 2
+  fi
+  PACK="$(cd -- "$2" && pwd)"
+fi
+if [[ -n "${LOKIDOT_SPRITESHEET:-}" ]]; then
+  echo "LOKIDOT_SPRITESHEET was replaced by --pack. Add manifest.json; see docs/sprite-packs.md." >&2
+  exit 2
+fi
 cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/module-cache"
-mkdir -p "$CLANG_MODULE_CACHE_PATH" .build/native
 TARGET="$(uname -m)-apple-macosx13.0"
-xcrun swiftc -O -whole-module-optimization -parse-as-library -emit-object -emit-module \
-  -module-name ZoomiesCore -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
-  -target "$TARGET" Sources/ZoomiesCore/*.swift \
-  -emit-module-path .build/native/ZoomiesCore.swiftmodule -o .build/native/ZoomiesCore.o
+./scripts/compile-core.sh
+if [[ -n "$PACK" ]]; then .build/native/SpritePackTool validate "$PACK"; fi
 # Stage outside synced folders: File Provider can inject Finder flags into an
 # .app after signing. The ZIP keeps the signed bundle intact for installation.
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/LokiDotZoomies.XXXXXX")"
@@ -17,14 +26,17 @@ xcrun swiftc -O -module-cache-path "$CLANG_MODULE_CACHE_PATH" -target "$TARGET" 
   -I .build/native Sources/LokiDotZoomies/*.swift .build/native/ZoomiesCore.o \
   -o "$APP/Contents/MacOS/LokiDotZoomies"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-# Artwork is explicitly supplied by its owner and is never part of public Git.
-SPRITESHEET="${LOKIDOT_SPRITESHEET:-$PWD/local-assets/LokiSpriteSheet.png}"
-if [[ -f "$SPRITESHEET" ]]; then
-  cp "$SPRITESHEET" "$APP/Contents/Resources/LokiSpriteSheet.png"
+if [[ -n "$PACK" ]]; then
+  .build/native/SpritePackTool bundle "$PACK" "$APP"
 fi
+# Only ready defaults are packaged. Never copy an entire input folder.
+for DEFAULT_PACK in Resources/Characters/*; do
+  [[ -d "$DEFAULT_PACK" ]] || continue
+  .build/native/SpritePackTool copy "$DEFAULT_PACK" "$APP/Contents/Resources/Characters/$(basename "$DEFAULT_PACK")"
+done
 codesign --force --sign - "$APP"
 codesign --verify --strict "$APP"
 mkdir -p dist
 ditto -c -k --keepParent "$APP" "$PWD/dist/LokiDot Zoomies.zip"
 printf '%s\n' "$APP" > dist/app-path.txt
-printf 'Built %s\n' "$APP"
+printf 'Built %s\nThis does not open or replace a running pet.\n' "$APP"

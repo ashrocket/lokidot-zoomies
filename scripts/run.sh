@@ -1,5 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
-./scripts/build.sh
-open "$(cat dist/app-path.txt)"
+RUN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+"$RUN_ROOT/scripts/build.sh" "$@"
+open "$(cat "$RUN_ROOT/dist/app-path.txt")"

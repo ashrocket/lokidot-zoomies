@@ -1,67 +1,98 @@
 # LokiDot Zoomies
 
-A small native macOS desktop pet that plays your existing Loki sprite animation along a curved zoomies route: left, lower and right, down through a loop, then left and up again.
+A small native macOS desktop pet. Bring your own complete sprite pack, validate it locally, and build a customized app. Pets run left, dip lower, race right, curve down through a loop, then sweep left and up.
 
-Version 1.1 uses the original sprite-sheet frames. The earlier substitute drawing has been removed. **This repository contains code only; personal avatar artwork stays on your Mac.**
+**Version 1.2 includes a standalone sprite validator, a Character menu, and Show All Ready Characters.** Loki, Beagle, and the line-drawing Whippet are complete, validated defaults.
 
-## Build and run
+## Validate your sprites first
 
-Requires macOS 13 or later and Xcode 15 or later with its command-line tools selected. No packages or downloads are needed by the build.
+Requires macOS 13+ and Xcode 15+ with its command-line tools selected. No third-party packages, downloads, server, or account are needed.
 
 ```sh
 git clone https://github.com/ashrocket/lokidot-zoomies.git
 cd lokidot-zoomies
-./scripts/test.sh
-./scripts/run.sh
+./scripts/validate-pack.sh /path/to/my-pet
 ```
 
-Without bundled artwork, find **🐾 Loki → Choose Loki Artwork…** and select your local PNG. The app waits quietly until artwork is loaded. The selection lasts for this session.
+A pack is a folder containing **manifest.json plus one transparent PNG**. The validator prints VALID and exits 0 only when the entire declared set passes. Invalid packs print a specific error and exit 1; incorrect command usage exits 2. The app importer and build use this same validator.
 
-To include your own sheet in a private local build:
+Choose a template:
+
+- [zoomies-v1 manifest](examples/zoomies-v1/manifest.json): requires idle, running-right, and running-left. Declare your own cell size, frame counts, and playback rates.
+- [pet-v2 manifest](examples/pet-v2/manifest.json): requires all nine standard animation rows plus sixteen look directions in a 1536 × 2288 atlas.
+
+Copy the appropriate manifest into your pack folder, set id and name, and supply the PNG named by image. **No missing poses are invented, mirrored, or replaced with Loki.** See the [complete schema, limits, examples, and error guide](docs/sprite-packs.md).
+
+For an explicitly synthetic, MIT-licensed test pack you can replace with your own artwork:
 
 ```sh
-mkdir -p local-assets
-cp /path/to/your/spritesheet.png local-assets/LokiSpriteSheet.png
-./scripts/run.sh
+./scripts/make-sample-pack.sh local-assets/my-pet
+./scripts/validate-pack.sh local-assets/my-pet
 ```
 
-Alternatively, set `LOKIDOT_SPRITESHEET` to a local PNG path when running the build script. The supported atlas has eight columns and eleven rows; a 1536 × 2288 sheet has 192 × 208 cells. Row 0 supplies six idle poses, row 1 eight right-running poses, and row 2 eight left-running poses. Frames retain their original registration, proportions, and sequence. Running playback uses 80 milliseconds per frame; resting uses a still idle pose.
-
-`local-assets/`, `.build/`, and `dist/` are ignored by Git. A local app or ZIP built with artwork **does contain that private artwork**; the MIT code license does not grant rights to redistribute it.
-
-`scripts/build.sh` creates an optimized app for the current Mac architecture, prints its temporary staging path, and saves `dist/LokiDot Zoomies.zip`. `scripts/run.sh` opens that app. For a permanent installation, unzip the archive and move the app to Applications in Finder. Staging outside synced folders keeps File Provider metadata from invalidating the local ad-hoc signature. The app is not Developer ID signed or notarized; respect any macOS security prompt. The scripts do not remove quarantine attributes or change security settings.
-
-## Controls and behavior
-
-- A 16-second lap starts when artwork is available. **Repeat gently** defaults to on, with 24 seconds of rest between laps. Uncheck it for a single lap.
-- **Pause / Resume** freezes and resumes travel and running poses together. **Zoomies!** starts a lap when resting and cannot stack simultaneous animations.
-- **Display** chooses a connected screen. The pet stays in its usable area, clear of the menu bar and Dock. Display changes recalculate the route.
-- macOS **Reduce Motion** keeps the pet still and disables Zoomies. Screen sleep and inactive login sessions hide and pause it; waking resumes it unless it was manually paused.
-- Quit with **🐾 Loki → Quit LokiDot Zoomies**. Quit intentionally has no keyboard shortcut. The menu keeps stable item positions while a lap finishes.
-
-The overlay is transparent, nonactivating, and click-through above ordinary windows. It has no Dock icon, login item, network listener, telemetry, third-party dependency, Accessibility requirement, or screen-recording requirement. It does not change the existing Dot avatar or any other app.
-
-## Implementation and checks
-
-AppKit owns one panel. Core Animation composites original bitmap frames along precomputed position and orientation keyframes. Both authored running directions are used; changing direction never reverses the temporal frame sequence. There is no per-frame Swift timer. Resting removes all animations and uses one cancellable timer.
-
-The route uses closed cubic Bézier curves, an arc-length lookup table, and smooth acceleration and deceleration. A conservative radius keeps the full banked sprite on screen, including its taller original frame geometry.
-
-Eleven XCTest cases cover route bounds, continuity, direction, pacing, invalid progress, atlas row order, authored frame counts, cell boundaries, and malformed image dimensions.
+## Build and open
 
 ```sh
-./scripts/test.sh
+# Validate and bundle your own pet, name, timing, and app identifier:
+./scripts/build.sh --pack /path/to/my-pet
+
+# Or build the ready defaults:
 ./scripts/build.sh
-# Export private animated previews without opening the desktop overlay:
-"$(cat dist/app-path.txt)/Contents/MacOS/LokiDotZoomies" --render-preview local-assets/previews
+
+# Open the app when you are ready:
+open "$(cat dist/app-path.txt)"
+
+# Start all three ready characters together:
+open "$(cat dist/app-path.txt)" --args --all-ready
 ```
 
-The Swift package can also be opened in Xcode or tested with `swift test`. The direct compiler scripts avoid a package-manifest sandbox and external dependencies.
+Builds fail before packaging incomplete packs. A successful build creates an optimized, locally signed app at the printed staging path and saves dist/LokiDot Zoomies.zip. Building does not quit, replace, or launch a running pet. Quit the older version deliberately before opening a replacement. scripts/run.sh accepts the same --pack argument and combines build with open.
 
-Optional `--spritesheet /path/to/sheet.png` overrides the bundled image. `--reduce-motion` exercises the still branch without changing system preferences. `--diagnostics /path/to/report.json` writes one local report after two seconds and never transmits it. Quit an existing instance before using launch flags.
+For a permanent installation, unzip the archive and move the app into Applications using Finder. Staging outside synced folders prevents File Provider metadata from invalidating the ad-hoc signature. The app is not Developer ID signed or notarized; respect macOS security prompts. No script changes security settings or removes quarantine attributes.
 
-See [verification notes](docs/VERIFICATION.md) for coverage and limitations.
+A customized app includes the validated pack's name, frame timing, proportions, and a separate bundle identifier derived from its id. Its archive also includes the ready defaults. Arbitrary files alongside a manifest are not copied.
+
+## Characters and controls
+
+- **Character → Loki / Beagle / Whippet** selects a validated default.
+- **Character → Show All Ready Characters** runs the ready defaults together in one transparent window, spaced along the same route. It becomes available with at least two ready defaults. Pause, repeat, Reduce Motion, and display selection apply to the group.
+- **Character → Import Sprite Pack…** validates a local pack before switching. Invalid imports keep the current character. The chosen character or imported folder is remembered locally; a missing saved pack produces an error instead of silently substituting another pet.
+- **Zoomies!** starts one lap while resting. A lap takes 16 seconds; **Repeat gently** defaults on with 24 seconds of rest between laps. Uncheck it for a single lap.
+- **Pause / Resume** freezes travel and sprite playback together.
+- **Display** selects a connected screen and keeps each pet inside its usable bounds.
+- macOS **Reduce Motion** keeps all pets still. Screen sleep and inactive login sessions pause and hide the overlay.
+- Quit with the **paw menu → Quit LokiDot Zoomies**. Quit has no keyboard shortcut.
+
+The overlay is transparent, nonactivating, and click-through. It has no login item, network listener, telemetry, third-party dependency, Accessibility requirement, or screen-recording requirement. It does not change the existing Dot avatar.
+
+## Ready artwork and previews
+
+| Character | Full sprite pack | Running preview |
+| --- | --- | --- |
+| Robot Loki | [Atlas](Resources/Characters/robot-loki/atlas.png) · [manifest](Resources/Characters/robot-loki/manifest.json) | [GIF](docs/previews/robot-loki-running.gif) |
+| Beagle | [Atlas](Resources/Characters/beagle/atlas.png) · [manifest](Resources/Characters/beagle/manifest.json) | [GIF](docs/previews/beagle-running.gif) |
+| Whippet | [Atlas](Resources/Characters/whippet/atlas.png) · [manifest](Resources/Characters/whippet/manifest.json) | [GIF](docs/previews/whippet-running.gif) |
+
+See [artwork provenance and review notes](docs/ARTWORK.md). User imports remain local unless you choose to distribute the built app or archive; those bundles contain the imported artwork. local-assets/, .build/, and dist/ are ignored by Git.
+
+## Checks and previews
+
+```sh
+./scripts/test.sh
+
+# After a build, export declared animations without opening an overlay:
+"$(cat dist/app-path.txt)/Contents/MacOS/LokiDotZoomies" \
+  --pack /path/to/my-pet --render-preview local-assets/previews
+```
+
+The tests generate synthetic PNG fixtures and cover complete and incomplete packs, v2 rows, malformed JSON, unknown fields, corrupt/disguised images, symlinks, path traversal, nonregular files, transparency, bounds, size limits, and multi-pet route phases. No private test artwork is required.
+
+The validator checks structure and pixels, not whether a gait, expression, or look direction is artistically correct. Review the GIFs and all poses yourself. This desktop app currently plays the two locomotion rows and uses the first idle frame while resting. It validates and preserves the other v2 states for portability; it does not yet animate in-place circles or prancing hops.
+
+The Swift package also exposes SpritePackTool for Xcode / swift run. Optional app flags are --pack, --all-ready, --render-preview, --reduce-motion, and --diagnostics. --all-ready starts the bundled characters together for this launch; it cannot be combined with --pack. Raw --spritesheet and LOKIDOT_SPRITESHEET imports have been replaced by manifest-based packs.
+
+See [verification and current limits](docs/VERIFICATION.md).
 
 ## License
 
-Original code is [MIT licensed](LICENSE). Avatar artwork is supplied separately by its owner and is not included in this repository. This is an independent desktop toy, not an official OpenAI app.
+Original code, synthetic fixtures, and the bundled artwork supplied for this release are [MIT licensed](LICENSE). Other artwork you import retains its own license. This is an independent desktop toy, not an official OpenAI app.

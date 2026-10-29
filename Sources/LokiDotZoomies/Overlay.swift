@@ -9,16 +9,22 @@ final class PetPanel: NSPanel {
 
 @MainActor
 final class Overlay {
+    private struct Performer {
+        let artwork: SpriteArtwork
+        let layer: CALayer
+        let route: MotionRoute
+        let phase: Double
+        func sample(_ progress: Double) -> MotionSample { route.sample(progress: progress, phase: phase) }
+    }
     let window: PetPanel
     let stage = CALayer()
-    let pet = CALayer()
-    let route: MotionRoute
-    private let artwork: SpriteArtwork
+    private var performers: [Performer] = []
+    var pet: CALayer { performers[0].layer }
+    var petCount: Int { performers.count }
 
-    init(screen: NSScreen, artwork: SpriteArtwork) {
-        self.artwork = artwork
+    init(screen: NSScreen, artworks: [SpriteArtwork]) {
+        precondition(!artworks.isEmpty)
         let frame = screen.visibleFrame
-        route = MotionRoute(bounds: CGRect(origin: .zero, size: frame.size))
         window = PetPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
                           backing: .buffered, defer: false)
         window.title = "LokiDot Zoomies Overlay"
@@ -36,60 +42,72 @@ final class Overlay {
         view.layer = stage
         view.setAccessibilityElement(false)
         stage.frame = view.bounds
-        stage.addSublayer(pet)
-        pet.bounds = CGRect(origin: .zero, size: route.spriteSize)
-        pet.contentsGravity = .resizeAspect
-        pet.contentsScale = screen.backingScaleFactor
-        pet.contents = artwork.idle[0]
-        pet.position = route.sample(progress: 0).point
-        pet.transform = Self.transform(route.sample(progress: 0))
+        for (index, artwork) in artworks.enumerated() {
+            let route = MotionRoute(bounds: CGRect(origin: .zero, size: frame.size), artworkSize: artwork.displaySize)
+            let layer = CALayer()
+            let performer = Performer(artwork: artwork, layer: layer, route: route,
+                                      phase: Double(index) / Double(artworks.count))
+            layer.bounds = CGRect(origin: .zero, size: route.spriteSize)
+            layer.contentsGravity = .resizeAspect
+            layer.contentsScale = screen.backingScaleFactor
+            layer.contents = artwork.idle[0]
+            layer.position = performer.sample(0).point
+            layer.transform = Self.transform(performer.sample(0))
+            stage.addSublayer(layer)
+            performers.append(performer)
+        }
         window.contentView = view
     }
 
     static func transform(_ sample: MotionSample) -> CATransform3D {
         let pose = MotionRoute.orientation(sample.tangent)
         let rotation = CATransform3DMakeRotation(pose.bank, 0, 0, 1)
-        // Left/right atlas rows already face in their authored directions.
-        // Narrow briefly at the turn without mirroring either original row.
         return CATransform3DScale(rotation, abs(pose.facing), 1, 1)
     }
 
     func run(delegate: CAAnimationDelegate) {
         resetClock()
-        pet.removeAllAnimations()
-        let count = 960
-        let samples = (0...count).map { route.sample(progress: Double($0) / Double(count)) }
-        let positions = CAKeyframeAnimation(keyPath: "position")
-        positions.values = samples.map { NSValue(point: $0.point) }
-        positions.duration = MotionRoute.lapDuration
-        positions.calculationMode = .linear
-        let turns = CAKeyframeAnimation(keyPath: "transform")
-        turns.values = samples.map { NSValue(caTransform3D: Self.transform($0)) }
-        turns.duration = MotionRoute.lapDuration
-        let stride = CAKeyframeAnimation(keyPath: "contents")
-        stride.values = samples.enumerated().map { index, sample in
-            artwork.runningFrame(time: Double(index) / Double(count) * MotionRoute.lapDuration,
-                                 facingLeft: sample.tangent.dx < 0)
+        for (index, performer) in performers.enumerated() {
+            let pet = performer.layer
+            pet.removeAllAnimations()
+            let count = 960
+            let samples = (0...count).map { performer.sample(Double($0) / Double(count)) }
+            let positions = CAKeyframeAnimation(keyPath: "position")
+            positions.values = samples.map { NSValue(point: $0.point) }
+            positions.duration = MotionRoute.lapDuration
+            positions.calculationMode = .linear
+            let turns = CAKeyframeAnimation(keyPath: "transform")
+            turns.values = samples.map { NSValue(caTransform3D: Self.transform($0)) }
+            turns.duration = MotionRoute.lapDuration
+            let stride = CAKeyframeAnimation(keyPath: "contents")
+            stride.values = samples.enumerated().map { frame, sample in
+                performer.artwork.runningFrame(time: Double(frame) / Double(count) * MotionRoute.lapDuration,
+                                               facingLeft: sample.tangent.dx < 0)
+            }
+            stride.calculationMode = .discrete
+            stride.duration = MotionRoute.lapDuration
+            let lap = CAAnimationGroup()
+            lap.animations = [positions, turns, stride]
+            lap.duration = MotionRoute.lapDuration
+            // One completion controls the shared rest timer for the whole group.
+            if index == 0 { lap.delegate = delegate }
+            pet.add(lap, forKey: "zoomies")
         }
-        stride.calculationMode = .discrete
-        stride.duration = MotionRoute.lapDuration
-        let lap = CAAnimationGroup()
-        lap.animations = [positions, turns, stride]
-        lap.duration = MotionRoute.lapDuration
-        lap.delegate = delegate
-        pet.add(lap, forKey: "zoomies")
     }
 
     func settle(keepPosition: Bool = false) {
-        let position = keepPosition ? (pet.presentation()?.position ?? pet.position) : route.sample(progress: 0).point
-        let transform = keepPosition ? (pet.presentation()?.transform ?? pet.transform) : Self.transform(route.sample(progress: 0))
-        pet.removeAllAnimations()
-        resetClock()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        pet.position = position
-        pet.transform = transform
-        pet.contents = artwork.idle[0]
+        for performer in performers {
+            let pet = performer.layer
+            let position = keepPosition ? (pet.presentation()?.position ?? pet.position) : performer.sample(0).point
+            let transform = keepPosition ? (pet.presentation()?.transform ?? pet.transform) : Self.transform(performer.sample(0))
+            pet.removeAllAnimations()
+            pet.position = position
+            pet.transform = transform
+            pet.contents = performer.artwork.idle[0]
+        }
+        resetClock()
         CATransaction.commit()
     }
 

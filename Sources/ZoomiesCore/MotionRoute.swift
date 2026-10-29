@@ -32,10 +32,10 @@ public struct MotionRoute {
         CGPoint(x: 0.73, y: 0.55), CGPoint(x: 0.89, y: 0.72)
     ]
 
-    public init(bounds: CGRect) {
+    public init(bounds: CGRect, artworkSize: CGSize = Self.artworkSize) {
         let scale = min(1, max(0.05, min(bounds.width / 600, bounds.height / 450)))
-        spriteSize = CGSize(width: Self.artworkSize.width * scale,
-                            height: Self.artworkSize.height * scale)
+        spriteSize = CGSize(width: artworkSize.width * scale,
+                            height: artworkSize.height * scale)
         // Circumscribed radius protects every bank angle, including on tiny screens.
         let radius = hypot(spriteSize.width, spriteSize.height) / 2 + 12 * scale
         safeBounds = CGRect(x: bounds.minX + min(radius, bounds.width / 2),
@@ -80,8 +80,10 @@ public struct MotionRoute {
         return eased + 0.012 * sin(4 * .pi * eased)
     }
 
-    public func sample(progress: Double) -> MotionSample {
-        sample(distanceFraction: Self.distanceProgress(progress))
+    public func sample(progress: Double, phase: Double = 0) -> MotionSample {
+        let offset = phase.isFinite ? phase.truncatingRemainder(dividingBy: 1) : 0
+        let fraction = (Self.distanceProgress(progress) + offset + 1).truncatingRemainder(dividingBy: 1)
+        return sample(distanceFraction: fraction)
     }
 
     public func sample(distanceFraction: Double) -> MotionSample {

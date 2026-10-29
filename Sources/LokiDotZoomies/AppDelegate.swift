@@ -18,6 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private var pauseItem: NSMenuItem!
     private var repeatItem: NSMenuItem!
     private var displayItem: NSMenuItem!
+    private var characterItem: NSMenuItem!
+    private var characters: [SpriteArtwork] = []
+    private var rejectedDefaults = 0
+    private var showAllCharacters = CommandLine.arguments.contains("--all-ready") || UserDefaults.standard.bool(forKey: "showAllCharacters")
+    private var activeArtworks: [SpriteArtwork] {
+        showAllCharacters ? characters : artwork.map { [$0] } ?? []
+    }
     private var restTimer: Timer?
     private var restDeadline: TimeInterval?
     private var restRemaining = MotionRoute.restDuration
@@ -36,13 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "LokiDot Zoomies")
-        statusItem.button?.title = " Loki"
+        statusItem.button?.title = " Zoomies"
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.setAccessibilityLabel("LokiDot Zoomies")
         statusItem.menu = menu
         menu.delegate = self
+        loadCharacters()
         buildMenu()
-        if let url = SpriteArtwork.initialURL() { artwork = try? SpriteArtwork(url: url) }
+        loadInitialArtwork()
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(displaysChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         let workspace = NSWorkspace.shared.notificationCenter
@@ -63,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     private func configureDisplay() {
-        guard let artwork else { mode = .needsArtwork; updateMenu(); return }
+        guard !activeArtworks.isEmpty else { mode = .needsArtwork; updateMenu(); return }
         let screens = NSScreen.screens
         guard let screen = screens.first(where: { displayID($0) == selectedDisplay })
             ?? screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
@@ -75,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         overlay?.settle()
         overlay?.window.close()
         selectedDisplay = displayID(screen)
-        overlay = Overlay(screen: screen, artwork: artwork)
+        overlay = Overlay(screen: screen, artworks: activeArtworks)
         rebuildDisplayMenu()
         overlay?.window.orderFrontRegardless()
         if reducedMotion { mode = .reducedMotion }
@@ -85,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     private func startLap() {
-        guard artwork != nil else { mode = .needsArtwork; updateMenu(); return }
+        guard !activeArtworks.isEmpty else { mode = .needsArtwork; updateMenu(); return }
         guard !reducedMotion else { mode = .reducedMotion; updateMenu(); return }
         restTimer?.invalidate()
         restTimer = nil
@@ -167,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     @objc private func displaysChanged() { configureDisplay() }
 
     @objc private func accessibilityChanged() {
-        guard artwork != nil else { return }
+        guard !activeArtworks.isEmpty else { return }
         if reducedMotion {
             restTimer?.invalidate()
             restTimer = nil
@@ -200,21 +208,121 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     @objc private func chooseArtwork() {
         let panel = NSOpenPanel()
-        panel.title = "Choose Loki Artwork"
-        panel.message = "Choose your local pet sprite sheet. It stays on this Mac."
-        panel.allowedContentTypes = [.png]
-        panel.canChooseDirectories = false
+        panel.title = "Import Sprite Pack"
+        panel.message = "Choose a folder containing manifest.json and a complete PNG sprite set."
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             artwork = try SpriteArtwork(url: url)
+            showAllCharacters = false
+            UserDefaults.standard.set(false, forKey: "showAllCharacters")
+            UserDefaults.standard.set(url.path, forKey: "selectedSpritePackPath")
+            UserDefaults.standard.removeObject(forKey: "selectedCharacterID")
+            rebuildCharacterMenu()
             configureDisplay()
         } catch {
-            let alert = NSAlert()
-            alert.messageText = "Artwork could not be loaded"
-            alert.informativeText = error.localizedDescription
-            alert.runModal()
+            showArtworkError(error)
         }
+    }
+
+    private func loadCharacters() {
+        guard let root = Bundle.main.resourceURL?.appendingPathComponent("Characters", isDirectory: true),
+              let folders = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else { return }
+        for url in folders.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            do {
+                let candidate = try SpriteArtwork(url: url)
+                guard !characters.contains(where: { $0.pack.manifest.id == candidate.pack.manifest.id }) else {
+                    rejectedDefaults += 1; continue
+                }
+                characters.append(candidate)
+            } catch { rejectedDefaults += 1 }
+        }
+    }
+
+    private func loadInitialArtwork() {
+        do {
+            // Explicit input and saved choices never silently fall back to Loki.
+            if CommandLine.arguments.contains("--pack"), let url = SpriteArtwork.initialURL() {
+                artwork = try SpriteArtwork(url: url)
+                showAllCharacters = false
+            } else if let saved = UserDefaults.standard.string(forKey: "selectedSpritePackPath") {
+                artwork = try SpriteArtwork(url: URL(fileURLWithPath: saved, isDirectory: true))
+            } else if let id = UserDefaults.standard.string(forKey: "selectedCharacterID") {
+                guard let selected = characters.first(where: { $0.pack.manifest.id == id }) else {
+                    throw SpritePackError("The saved character is unavailable. Choose a ready character or import a complete pack.")
+                }
+                artwork = selected
+            } else if let url = SpriteArtwork.initialURL() {
+                artwork = try SpriteArtwork(url: url)
+            } else {
+                artwork = characters.first(where: { $0.pack.manifest.id == "robot-loki" }) ?? characters.first
+            }
+        } catch { showArtworkError(error) }
+        if characters.isEmpty { showAllCharacters = false }
+        rebuildCharacterMenu()
+    }
+
+    @objc private func selectCharacter(_ item: NSMenuItem) {
+        guard let id = item.representedObject as? String,
+              let selected = characters.first(where: { $0.pack.manifest.id == id }) else { return }
+        artwork = selected
+        showAllCharacters = false
+        UserDefaults.standard.set(false, forKey: "showAllCharacters")
+        UserDefaults.standard.set(id, forKey: "selectedCharacterID")
+        UserDefaults.standard.removeObject(forKey: "selectedSpritePackPath")
+        rebuildCharacterMenu()
+        configureDisplay()
+    }
+
+    @objc private func selectAllCharacters() {
+        guard characters.count > 1 else { return }
+        showAllCharacters = true
+        UserDefaults.standard.set(true, forKey: "showAllCharacters")
+        rebuildCharacterMenu()
+        configureDisplay()
+    }
+
+    private func showArtworkError(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Sprite pack could not be loaded"
+        alert.informativeText = error.localizedDescription
+        alert.runModal()
+    }
+
+    private func rebuildCharacterMenu() {
+        guard characterItem != nil else { return }
+        let choices = NSMenu()
+        choices.autoenablesItems = false
+        let all = NSMenuItem(title: "Show All Ready Characters", action: #selector(selectAllCharacters), keyEquivalent: "")
+        all.target = self
+        all.isEnabled = characters.count > 1
+        all.state = showAllCharacters ? .on : .off
+        choices.addItem(all)
+        choices.addItem(.separator())
+        for candidate in characters {
+            let item = NSMenuItem(title: candidate.name, action: #selector(selectCharacter(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = candidate.pack.manifest.id
+            item.state = !showAllCharacters && artwork?.sourceURL == candidate.sourceURL ? .on : .off
+            choices.addItem(item)
+        }
+        if let artwork, !characters.contains(where: { $0.sourceURL == artwork.sourceURL }) {
+            let current = NSMenuItem(title: "\(artwork.name) · Imported", action: nil, keyEquivalent: "")
+            current.state = showAllCharacters ? .off : .on; current.isEnabled = false
+            choices.addItem(current)
+        }
+        if rejectedDefaults > 0 {
+            let notice = NSMenuItem(title: "\(rejectedDefaults) incomplete pack(s) unavailable", action: nil, keyEquivalent: "")
+            notice.isEnabled = false; choices.addItem(notice)
+        }
+        choices.addItem(.separator())
+        let importer = NSMenuItem(title: "Import Sprite Pack…", action: #selector(chooseArtwork), keyEquivalent: "")
+        importer.target = self
+        choices.addItem(importer)
+        characterItem.submenu = choices
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -238,7 +346,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         menu.addItem(.separator())
         displayItem = NSMenuItem(title: "Display", action: nil, keyEquivalent: "")
         menu.addItem(displayItem)
-        add("Choose Loki Artwork…", action: #selector(chooseArtwork), key: "")
+        characterItem = NSMenuItem(title: "Character", action: nil, keyEquivalent: "")
+        menu.addItem(characterItem)
+        rebuildCharacterMenu()
         menu.addItem(.separator())
         // A background pet should not consume Command-Q intended for another app.
         add("Quit LokiDot Zoomies", action: #selector(quit), key: "")
@@ -248,12 +358,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private func updateMenu() {
         guard statusLabel != nil else { return }
         let status: String
+        let petName = showAllCharacters ? "\(characters.count) pets" : artwork?.name ?? "Your pet"
+        let verb = showAllCharacters ? "are" : "is"
         switch mode {
-        case .running: status = "LokiDot is doing zoomies"
-        case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "LokiDot is resting"
-        case .pausedRun, .pausedRest: status = "LokiDot is paused"
+        case .running: status = "\(petName) \(verb) doing zoomies"
+        case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "\(petName) \(verb) resting"
+        case .pausedRun, .pausedRest: status = "\(petName) \(verb) paused"
         case .reducedMotion: status = "Resting · Reduce Motion is on"
-        case .needsArtwork: status = "Choose Loki Artwork to begin"
+        case .needsArtwork: status = "Import a complete sprite pack to begin"
         }
         // Keep menu item identities and positions stable while tracking a menu.
         statusLabel.title = status
@@ -264,6 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         repeatItem.isEnabled = mode != .needsArtwork
         repeatItem.state = repeatEnabled ? .on : .off
         statusItem.button?.toolTip = "LokiDot Zoomies — \(status)"
+        statusItem.button?.title = showAllCharacters ? " All Pets" : " \(String((artwork?.name ?? "Zoomies").prefix(16)))"
     }
 
     private func rebuildDisplayMenu() {
@@ -297,6 +410,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         let position = overlay.pet.presentation()?.position ?? overlay.pet.position
         let report: [String: Any] = [
             "pid": ProcessInfo.processInfo.processIdentifier,
+            "characterCount": overlay.petCount,
+            "showAllCharacters": showAllCharacters,
             "mode": mode.rawValue,
             "reduceMotion": reducedMotion,
             "repeatEnabled": repeatEnabled,
