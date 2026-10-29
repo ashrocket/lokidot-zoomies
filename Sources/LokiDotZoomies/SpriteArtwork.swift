@@ -10,6 +10,13 @@ final class SpriteArtwork {
     var name: String { pack.manifest.name }
     var idle: [CGImage] { pack.frames["idle"]! }
     var displaySize: CGSize { pack.displaySize }
+    var canPrance: Bool { pack.frames["jumping"] != nil }
+
+    func jumpingFrame(progress: Double) -> CGImage {
+        precondition(canPrance, "Prancing requires authored jumping frames")
+        let frames = pack.frames["jumping"]!
+        return frames[min(frames.count - 1, Int(max(0, min(1, progress)) * Double(frames.count)))]
+    }
 
     init(url: URL) throws {
         pack = try SpritePack.load(directory: url)

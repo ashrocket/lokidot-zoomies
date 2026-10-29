@@ -9,125 +9,134 @@ final class PetPanel: NSPanel {
 
 @MainActor
 final class Overlay {
-    private struct Performer {
+    private final class Performer {
         let artwork: SpriteArtwork
-        let layer: CALayer
-        let route: MotionRoute
-        let phase: Double
-        func sample(_ progress: Double) -> MotionSample { route.sample(progress: progress, phase: phase) }
+        let layer = CALayer()
+        let left = CALayer()
+        let right = CALayer()
+        var routine: MotionRoutine
+        init(artwork: SpriteArtwork, routine: MotionRoutine) { self.artwork = artwork; self.routine = routine }
     }
     let window: PetPanel
     let stage = CALayer()
     private var performers: [Performer] = []
+    private let bounds: CGRect
     var pet: CALayer { performers[0].layer }
     var petCount: Int { performers.count }
 
     init(screen: NSScreen, artworks: [SpriteArtwork]) {
         precondition(!artworks.isEmpty)
         let frame = screen.visibleFrame
-        window = PetPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
-                          backing: .buffered, defer: false)
+        bounds = CGRect(origin: .zero, size: frame.size)
+        window = PetPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.title = "LokiDot Zoomies Overlay"
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = false
-        window.ignoresMouseEvents = true
-        window.level = .floating
-        window.hidesOnDeactivate = false
-        window.isMovable = false
-        window.isReleasedWhenClosed = false
+        window.isOpaque = false; window.backgroundColor = .clear; window.hasShadow = false
+        window.ignoresMouseEvents = true; window.level = .floating; window.hidesOnDeactivate = false
+        window.isMovable = false; window.isReleasedWhenClosed = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        let view = NSView(frame: CGRect(origin: .zero, size: frame.size))
-        view.wantsLayer = true
-        view.layer = stage
-        view.setAccessibilityElement(false)
-        stage.frame = view.bounds
+        let view = NSView(frame: bounds)
+        view.wantsLayer = true; view.layer = stage; view.setAccessibilityElement(false)
+        stage.frame = bounds
         for (index, artwork) in artworks.enumerated() {
-            let route = MotionRoute(bounds: CGRect(origin: .zero, size: frame.size), artworkSize: artwork.displaySize)
-            let layer = CALayer()
-            let performer = Performer(artwork: artwork, layer: layer, route: route,
-                                      phase: Double(index) / Double(artworks.count))
-            layer.bounds = CGRect(origin: .zero, size: route.spriteSize)
-            layer.contentsGravity = .resizeAspect
-            layer.contentsScale = screen.backingScaleFactor
-            layer.contents = artwork.idle[0]
-            layer.position = performer.sample(0).point
-            layer.transform = Self.transform(performer.sample(0))
-            stage.addSublayer(layer)
+            let routine = MotionRoutine(style: .zoomies, bounds: bounds, artworkSize: artwork.displaySize,
+                                        index: index, count: artworks.count)
+            let performer = Performer(artwork: artwork, routine: routine)
+            performer.layer.bounds = CGRect(origin: .zero, size: routine.route.spriteSize)
+            for sprite in [performer.left, performer.right] {
+                sprite.frame = performer.layer.bounds
+                sprite.contentsGravity = .resizeAspect
+                sprite.contentsScale = screen.backingScaleFactor
+                performer.layer.addSublayer(sprite)
+            }
+            performer.left.contents = artwork.idle[0]
+            performer.right.opacity = 0
+            performer.layer.position = routine.sample(progress: 0).point
+            stage.addSublayer(performer.layer)
             performers.append(performer)
         }
         window.contentView = view
     }
 
-    static func transform(_ sample: MotionSample) -> CATransform3D {
-        let pose = MotionRoute.orientation(sample.tangent)
+    static func transform(_ pose: MotionPose) -> CATransform3D {
         let rotation = CATransform3DMakeRotation(pose.bank, 0, 0, 1)
-        return CATransform3DScale(rotation, abs(pose.facing), 1, 1)
+        return CATransform3DScale(rotation, pose.scaleX, pose.scaleY, 1)
     }
 
-    func run(delegate: CAAnimationDelegate) {
+    private func keyframes(_ key: String, _ values: [Any], duration: TimeInterval,
+                           discrete: Bool = false) -> CAKeyframeAnimation {
+        let animation = CAKeyframeAnimation(keyPath: key)
+        animation.values = values; animation.duration = duration
+        animation.calculationMode = discrete ? .discrete : .linear
+        return animation
+    }
+
+    func run(style: MotionStyle, delegate: CAAnimationDelegate) {
         resetClock()
+        CATransaction.begin(); CATransaction.setDisableActions(true)
         for (index, performer) in performers.enumerated() {
-            let pet = performer.layer
-            pet.removeAllAnimations()
-            let count = 960
-            let samples = (0...count).map { performer.sample(Double($0) / Double(count)) }
-            let positions = CAKeyframeAnimation(keyPath: "position")
-            positions.values = samples.map { NSValue(point: $0.point) }
-            positions.duration = MotionRoute.lapDuration
-            positions.calculationMode = .linear
-            let turns = CAKeyframeAnimation(keyPath: "transform")
-            turns.values = samples.map { NSValue(caTransform3D: Self.transform($0)) }
-            turns.duration = MotionRoute.lapDuration
-            let stride = CAKeyframeAnimation(keyPath: "contents")
-            stride.values = samples.enumerated().map { frame, sample in
-                performer.artwork.runningFrame(time: Double(frame) / Double(count) * MotionRoute.lapDuration,
-                                               facingLeft: sample.tangent.dx < 0)
-            }
-            stride.calculationMode = .discrete
-            stride.duration = MotionRoute.lapDuration
+            for layer in [performer.layer, performer.left, performer.right] { layer.removeAllAnimations() }
+            performer.routine = MotionRoutine(style: style, bounds: bounds, artworkSize: performer.artwork.displaySize,
+                                              index: index, count: performers.count)
+            let duration = style.duration
+            let count = Int(duration * 60)
+            // No per-frame AppKit work: poses, sprite contents, and turn blends
+            // are compiled once; Core Animation owns their shared clock.
+            let poses = (0...count).map { performer.routine.sample(progress: Double($0) / Double(count)) }
             let lap = CAAnimationGroup()
-            lap.animations = [positions, turns, stride]
-            lap.duration = MotionRoute.lapDuration
-            // One completion controls the shared rest timer for the whole group.
+            lap.animations = [
+                keyframes("position", poses.map { NSValue(point: $0.point) }, duration: duration),
+                keyframes("transform", poses.map { NSValue(caTransform3D: Self.transform($0)) }, duration: duration),
+                keyframes("zPosition", poses.map { -$0.point.y }, duration: duration)
+            ]
+            lap.duration = duration
             if index == 0 { lap.delegate = delegate }
-            pet.add(lap, forKey: "zoomies")
+            performer.layer.position = poses[0].point
+            performer.layer.transform = Self.transform(poses[0])
+            performer.layer.add(lap, forKey: "zoomies")
+            if style == .prance {
+                precondition(performer.artwork.canPrance)
+                performer.left.opacity = 1; performer.right.opacity = 0
+                performer.left.add(keyframes("contents", poses.map {
+                    performer.artwork.jumpingFrame(progress: $0.jumpProgress!)
+                }, duration: duration, discrete: true), forKey: "gait")
+            } else {
+                // Crossfade authored directions through turns without mirroring
+                // artwork or squeezing the pet to an invisible, zero-width line.
+                for (sprite, facingLeft) in [(performer.left, true), (performer.right, false)] {
+                    sprite.add(keyframes("contents", poses.map {
+                        performer.artwork.runningFrame(time: $0.strideTime, facingLeft: facingLeft)
+                    }, duration: duration, discrete: true), forKey: "gait")
+                    sprite.add(keyframes("opacity", poses.map {
+                        facingLeft ? 1 - $0.rightWeight : $0.rightWeight
+                    }, duration: duration), forKey: "turn")
+                }
+            }
         }
-    }
-
-    func settle(keepPosition: Bool = false) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        for performer in performers {
-            let pet = performer.layer
-            let position = keepPosition ? (pet.presentation()?.position ?? pet.position) : performer.sample(0).point
-            let transform = keepPosition ? (pet.presentation()?.transform ?? pet.transform) : Self.transform(performer.sample(0))
-            pet.removeAllAnimations()
-            pet.position = position
-            pet.transform = transform
-            pet.contents = performer.artwork.idle[0]
-        }
-        resetClock()
         CATransaction.commit()
     }
 
+    func settle(keepPosition: Bool = false) {
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        for performer in performers {
+            let pose = performer.routine.sample(progress: 0)
+            let position = keepPosition ? (performer.layer.presentation()?.position ?? performer.layer.position) : pose.point
+            let transform = keepPosition ? (performer.layer.presentation()?.transform ?? performer.layer.transform) : Self.transform(pose)
+            for layer in [performer.layer, performer.left, performer.right] { layer.removeAllAnimations() }
+            performer.layer.position = position; performer.layer.transform = transform
+            performer.left.contents = performer.artwork.idle[0]; performer.left.opacity = 1
+            performer.right.opacity = 0
+        }
+        resetClock(); CATransaction.commit()
+    }
+
     func pause() {
-        let pausedTime = stage.convertTime(CACurrentMediaTime(), from: nil)
-        stage.speed = 0
-        stage.timeOffset = pausedTime
+        let time = stage.convertTime(CACurrentMediaTime(), from: nil)
+        stage.speed = 0; stage.timeOffset = time
     }
-
     func resume() {
-        let pausedTime = stage.timeOffset
-        stage.speed = 1
-        stage.timeOffset = 0
-        stage.beginTime = 0
-        stage.beginTime = stage.convertTime(CACurrentMediaTime(), from: nil) - pausedTime
+        let time = stage.timeOffset
+        stage.speed = 1; stage.timeOffset = 0; stage.beginTime = 0
+        stage.beginTime = stage.convertTime(CACurrentMediaTime(), from: nil) - time
     }
-
-    private func resetClock() {
-        stage.speed = 1
-        stage.timeOffset = 0
-        stage.beginTime = 0
-    }
+    private func resetClock() { stage.speed = 1; stage.timeOffset = 0; stage.beginTime = 0 }
 }

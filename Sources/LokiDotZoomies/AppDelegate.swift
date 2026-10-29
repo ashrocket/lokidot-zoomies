@@ -19,6 +19,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private var repeatItem: NSMenuItem!
     private var displayItem: NSMenuItem!
     private var characterItem: NSMenuItem!
+    private var motionItem: NSMenuItem!
+    private var playground: PlaygroundWindow?
+    private var pendingRequests: [LaunchRequest] = []
+    private var motionStyle = MotionStyle(rawValue: UserDefaults.standard.string(forKey: "motionStyle") ?? "") ?? .zoomies
+    private var canPrance: Bool { !activeArtworks.isEmpty && activeArtworks.allSatisfy(\.canPrance) }
     private var characters: [SpriteArtwork] = []
     private var rejectedDefaults = 0
     private var showAllCharacters = CommandLine.arguments.contains("--all-ready") || UserDefaults.standard.bool(forKey: "showAllCharacters")
@@ -51,6 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         loadCharacters()
         buildMenu()
         loadInitialArtwork()
+        if let index = CommandLine.arguments.firstIndex(of: "--motion"),
+           let style = MotionStyle(rawValue: CommandLine.arguments[index + 1]) { motionStyle = style }
+        if motionStyle == .prance && !canPrance { motionStyle = .zoomies }
+        buildApplicationMenu()
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(displaysChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         let workspace = NSWorkspace.shared.notificationCenter
@@ -61,6 +70,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         workspace.addObserver(self, selector: #selector(waking), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
         configureDisplay()
         updateMenu()
+        for request in pendingRequests { accept(request) }
+        pendingRequests.removeAll()
+        if !CommandLine.arguments.contains("--background") { showPlayground() }
 
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
@@ -99,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         restTimer = nil
         restDeadline = nil
         mode = .running
-        overlay?.run(delegate: self)
+        overlay?.run(style: motionStyle, delegate: self)
         updateMenu()
     }
 
@@ -220,6 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             UserDefaults.standard.set(false, forKey: "showAllCharacters")
             UserDefaults.standard.set(url.path, forKey: "selectedSpritePackPath")
             UserDefaults.standard.removeObject(forKey: "selectedCharacterID")
+            if motionStyle == .prance && !canPrance { motionStyle = .zoomies }
             rebuildCharacterMenu()
             configureDisplay()
         } catch {
@@ -273,6 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         UserDefaults.standard.set(false, forKey: "showAllCharacters")
         UserDefaults.standard.set(id, forKey: "selectedCharacterID")
         UserDefaults.standard.removeObject(forKey: "selectedSpritePackPath")
+        if motionStyle == .prance && !canPrance { motionStyle = .zoomies }
         rebuildCharacterMenu()
         configureDisplay()
     }
@@ -327,6 +341,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPlayground()
+        return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            do {
+                let request = try LaunchRequest(url: url)
+                if statusLabel == nil { pendingRequests.append(request) }
+                else { accept(request) }
+            } catch { showArtworkError(error) }
+        }
+    }
+
+    private func accept(_ request: LaunchRequest) {
+        switch request.action {
+        case .quit: NSApp.terminate(nil); return
+        case .pause:
+            if mode == .running || mode == .resting { togglePause() }; return
+        case .resume:
+            if mode == .pausedRun || mode == .pausedRest { togglePause() }; return
+        case .show, .play: break
+        }
+        do {
+            var candidate = artwork
+            var all = showAllCharacters
+            if let path = request.packPath {
+                candidate = try SpriteArtwork(url: URL(fileURLWithPath: path, isDirectory: true)); all = false
+            } else if let id = request.character {
+                if id == "all" { all = true }
+                else if let selected = characters.first(where: { $0.pack.manifest.id == id }) { candidate = selected; all = false }
+                else { throw SpritePackError("That dog is unavailable. Try robot-loki, beagle, whippet, or all.") }
+            }
+            let selectedStyle = request.motion ?? motionStyle
+            let selectedPacks = all ? characters : candidate.map { [$0] } ?? []
+            guard !selectedPacks.isEmpty else { throw SpritePackError("Add a complete sprite pack first.") }
+            guard selectedStyle != .prance || selectedPacks.allSatisfy(\.canPrance) else {
+                throw SpritePackError("Prancing needs a pet-v2 pack with jumping poses. This dog can still do zoomies and little circles.")
+            }
+            artwork = candidate; showAllCharacters = all; motionStyle = selectedStyle
+            UserDefaults.standard.set(all, forKey: "showAllCharacters")
+            UserDefaults.standard.set(selectedStyle.rawValue, forKey: "motionStyle")
+            if let path = request.packPath {
+                UserDefaults.standard.set(path, forKey: "selectedSpritePackPath")
+                UserDefaults.standard.removeObject(forKey: "selectedCharacterID")
+            } else if let id = request.character, id != "all" {
+                UserDefaults.standard.set(id, forKey: "selectedCharacterID")
+                UserDefaults.standard.removeObject(forKey: "selectedSpritePackPath")
+            }
+            rebuildCharacterMenu()
+            if request.action == .play || request.character != nil || request.packPath != nil || request.motion != nil {
+                mode = .resting
+                configureDisplay()
+            }
+            if request.action == .show { showPlayground() }
+            updateMenu()
+        } catch { showArtworkError(error) }
+    }
+
+    @objc private func selectMotion(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? String, let style = MotionStyle(rawValue: raw),
+              let request = try? LaunchRequest(action: .play, motion: style) else { return }
+        accept(request)
+    }
+
+    @objc private func showPlayground() {
+        if playground == nil {
+            let controller = PlaygroundWindow()
+            controller.onPlay = { [weak self] id, style in
+                guard let self else { return }
+                let request = try? LaunchRequest(action: .play, motion: style, character: id == "imported" ? nil : id,
+                                                 packPath: id == "imported" ? self.artwork?.sourceURL.path : nil)
+                if let request { self.accept(request) }
+            }
+            controller.onPause = { [weak self] in self?.togglePause() }
+            controller.onImport = { [weak self] in self?.chooseArtwork() }
+            playground = controller
+        }
+        updateMenu()
+        playground?.present()
+    }
+
+    private func buildApplicationMenu() {
+        let main = NSMenu(), appMenu = NSMenu(), root = NSMenuItem()
+        let show = NSMenuItem(title: "Show LokiDot Zoomies", action: #selector(showPlayground), keyEquivalent: "0")
+        show.target = self; appMenu.addItem(show); appMenu.addItem(.separator())
+        let quit = NSMenuItem(title: "Quit LokiDot Zoomies", action: #selector(quit), keyEquivalent: "q")
+        quit.target = self; appMenu.addItem(quit); root.submenu = appMenu; main.addItem(root)
+        NSApp.mainMenu = main
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         restTimer?.invalidate()
         overlay?.window.close()
@@ -339,6 +445,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         statusLabel = NSMenuItem(title: "LokiDot Zoomies", action: nil, keyEquivalent: "")
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
+        add("Show playground…", action: #selector(showPlayground), key: "")
         menu.addItem(.separator())
         zoomiesItem = add("Zoomies!", action: #selector(zoomies), key: "z")
         pauseItem = add("Pause", action: #selector(togglePause), key: "p")
@@ -349,6 +456,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         characterItem = NSMenuItem(title: "Character", action: nil, keyEquivalent: "")
         menu.addItem(characterItem)
         rebuildCharacterMenu()
+        motionItem = NSMenuItem(title: "Moves", action: nil, keyEquivalent: "")
+        let moves = NSMenu(); moves.autoenablesItems = false
+        for style in MotionStyle.allCases {
+            let item = NSMenuItem(title: style.title, action: #selector(selectMotion(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = style.rawValue; moves.addItem(item)
+        }
+        motionItem.submenu = moves; menu.addItem(motionItem)
         menu.addItem(.separator())
         // A background pet should not consume Command-Q intended for another app.
         add("Quit LokiDot Zoomies", action: #selector(quit), key: "")
@@ -361,7 +475,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         let petName = showAllCharacters ? "\(characters.count) pets" : artwork?.name ?? "Your pet"
         let verb = showAllCharacters ? "are" : "is"
         switch mode {
-        case .running: status = "\(petName) \(verb) doing zoomies"
+        case .running: status = "\(petName) · \(motionStyle.title.lowercased())"
         case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "\(petName) \(verb) resting"
         case .pausedRun, .pausedRest: status = "\(petName) \(verb) paused"
         case .reducedMotion: status = "Resting · Reduce Motion is on"
@@ -377,6 +491,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         repeatItem.state = repeatEnabled ? .on : .off
         statusItem.button?.toolTip = "LokiDot Zoomies — \(status)"
         statusItem.button?.title = showAllCharacters ? " All Pets" : " \(String((artwork?.name ?? "Zoomies").prefix(16)))"
+        for item in motionItem?.submenu?.items ?? [] {
+            let style = item.representedObject as? String
+            item.state = style == motionStyle.rawValue ? .on : .off
+            item.isEnabled = mode != .needsArtwork && (style != "prance" || canPrance)
+        }
+        var choices = characters.map { (id: $0.pack.manifest.id, name: $0.name, canPrance: $0.canPrance) }
+        if characters.count > 1 { choices.insert((id: "all", name: "The whole pack", canPrance: characters.allSatisfy(\.canPrance)), at: 0) }
+        if let artwork, !characters.contains(where: { $0.sourceURL == artwork.sourceURL }) {
+            choices.append((id: "imported", name: artwork.name + " · Your dog", canPrance: artwork.canPrance))
+        }
+        let selected = showAllCharacters ? "all" : characters.first(where: { $0.sourceURL == artwork?.sourceURL })?.pack.manifest.id ?? "imported"
+        playground?.update(characters: choices, selected: selected, motion: motionStyle, status: status,
+                           paused: paused, canPlay: mode != .needsArtwork && mode != .reducedMotion)
     }
 
     private func rebuildDisplayMenu() {
@@ -413,6 +540,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             "characterCount": overlay.petCount,
             "showAllCharacters": showAllCharacters,
             "mode": mode.rawValue,
+            "motion": motionStyle.rawValue,
+            "bundlePath": Bundle.main.bundlePath,
+            "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") ?? "unknown",
+            "characters": activeArtworks.map { $0.pack.manifest.id },
+            "playgroundVisible": playground?.window?.isVisible ?? false,
             "reduceMotion": reducedMotion,
             "repeatEnabled": repeatEnabled,
             "windowNumber": overlay.window.windowNumber,

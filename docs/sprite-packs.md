@@ -118,6 +118,8 @@ Place a complete canonical pack at Resources/Characters/your-pet/ with image set
 
 The Character menu remembers the chosen id, or the local folder for an imported pack. Show All Ready Characters displays the validated defaults in one window with staggered route phases. Selecting one character returns to individual mode.
 
-## Future motion work
+## Motion capabilities
 
-Tight in-place circles and small prancing hops need suitable turning and jumping poses plus motion review. Current v2 look frames represent gaze, not a body turntable. Do not use them as an upside-down rotating dog or claim expanded motions are implemented. Those motions are a follow-up after the three-character demo.
+Version 1.3 supports broad zoomies, compact upright circles, and prancing hops. Both formats can run and circle using their authored left and right running poses. A complete pet-v2 pack also supplies the jumping poses used by prancing; the simple zoomies-v1 format does not enable that move.
+
+Circles blend the two running directions with modest banking and depth changes. This is not a 3D body turntable. The v2 look frames represent gaze and are never used to spin a dog upside down. All three bundled dogs have the required jumping artwork.

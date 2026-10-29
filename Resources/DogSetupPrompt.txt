@@ -1,0 +1,38 @@
+Help me turn my dog into a LokiDot Zoomies desktop companion. Please do the setup, not just describe it.
+
+Use the dog photo(s) I attach as the reference. Ask for my dog's name and a clear full-body photo if I haven't supplied them. A side view is best; a second view helps with markings. Keep the dog's actual coat, ears, tail, proportions, and personality. Ask only for information you need.
+
+Project and format guide:
+https://github.com/ashrocket/lokidot-zoomies
+https://github.com/ashrocket/lokidot-zoomies/blob/main/docs/sprite-packs.md
+
+Make a simple zoomies-v1 pack first. It supports Big zoomies and Little circles. Happy prance requires the separate, complete 73-pose pet-v2 format; do not promise it for this starter or add unsupported animation fields.
+
+1. Find the app/launcher and make a new pack folder.
+Use `command -v lokidot`, the project's `./lokidot`, or the helper at "$HOME/Applications/LokiDot Zoomies.app/Contents/MacOS/lokidot". If none is available, consult the repository's installation instructions and explain the missing prerequisite. Don't claim validation ran if you cannot run it.
+Choose a new folder such as "$HOME/Pictures/LokiDot/Biscuit", replacing Biscuit with my dog's name. Avoid overwriting an existing pack. Run `lokidot new-dog "PACK_FOLDER" "DOG_NAME"` with the real launcher and paths. This creates a working practice sprite and manifest; the practice sprite MUST be replaced with my dog's artwork before calling the job finished.
+
+2. Generate or draw the actual animation artwork.
+Create one transparent RGBA PNG named atlas.png. Use a 4-column, 3-row grid of 256 x 256 pixel cells: exactly 1024 x 768 pixels overall. Rows run from the TOP. Keep every pose inside its own cell with transparent padding.
+- Row 1: one relaxed idle pose in column 1; leave columns 2-4 completely transparent.
+- Row 2: four consecutive frames of the dog running RIGHT, one per column.
+- Row 3: four separately authored frames running LEFT, one per column.
+The run should form a believable looping stride, not four identical poses. Keep body size, foot baseline, coat markings, and framing consistent. Preserve left/right markings; do not mirror one direction to manufacture the other. No painted checkerboard, background, ground, captions, borders, grid lines, or extra dogs. Use true transparency.
+If an image tool misses the grid or transparency, repair the artwork and recheck it. If you cannot create image files, give me the exact image-generation brief and explain what is still missing; don't substitute the practice character or a photo for finished animation.
+
+3. Finish manifest.json beside atlas.png.
+Use schemaVersion 1, format "zoomies-v1", image "atlas.png", frameWidth 256, frameHeight 256. Give the dog a readable name (up to 40 characters) and a unique lowercase id starting with a letter (letters, digits, and hyphens only, up to 32 characters).
+Use exactly these animation entries; their rows and columns are ZERO-based:
+"idle": {"row":0,"column":0,"frameCount":1,"fps":1}
+"running-right": {"row":1,"column":0,"frameCount":4,"fps":8}
+"running-left": {"row":2,"column":0,"frameCount":4,"fps":8}
+Preserve the starter's valid JSON structure. If you deliberately use a different cell size, update both frame dimensions to match the actual PNG grid. Do not add executable hooks, URLs, or extra manifest fields.
+
+4. Validate, inspect, and let the dog out.
+Run `lokidot validate "PACK_FOLDER"`. Fix errors until it exits successfully. Inspect every frame and an animated preview: the validator checks structure and transparency, not whether this looks like my dog or whether the feet move naturally.
+Preview with `lokidot dog "PACK_FOLDER" circle`, then try zoomies. You can also export GIF previews using the app executable's `--pack "PACK_FOLDER" --render-preview "PREVIEW_FOLDER"` options.
+If you cannot run the Mac app, say so and give me the exact local commands; don't claim live playback was verified.
+
+5. Hand me the finished result.
+Give me the exact pack folder, manifest.json, atlas.png, a preview, and the validation result. Explain: open LokiDot Zoomies, click "Add your dog…", and choose the FOLDER containing those two files. Keep it somewhere permanent because the app remembers that location. Include a correctly quoted launch command for my exact folder.
+Only describe the dog as ready after its actual artwork is in place and validation has passed. Do not publish my photos or pack; I will decide if I want to share them.

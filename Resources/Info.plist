@@ -6,11 +6,17 @@
     <key>CFBundleDisplayName</key><string>LokiDot Zoomies</string>
     <key>CFBundleExecutable</key><string>LokiDotZoomies</string>
     <key>CFBundleIdentifier</key><string>com.ashrocket.LokiDotZoomies</string>
-    <key>CFBundleVersion</key><string>1</string>
-    <key>CFBundleShortVersionString</key><string>1.2.0</string>
+    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleShortVersionString</key><string>1.3.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
-    <key>LSUIElement</key><true/>
+    <key>LSUIElement</key><false/>
+    <key>CFBundleURLTypes</key>
+    <array><dict>
+        <key>CFBundleURLName</key><string>com.ashrocket.LokiDotZoomies.control</string>
+        <key>CFBundleURLSchemes</key><array><string>lokidot</string></array>
+        <key>CFBundleTypeRole</key><string>Viewer</string>
+    </dict></array>
     <key>NSSupportsAutomaticTermination</key><false/>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>

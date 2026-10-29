@@ -1,33 +1,34 @@
-# Verification
+# Verification — v1.3.0
 
-Version 1.2 adds a common SpritePack loader used by the standalone CLI, app importer, and build gate. It supports a flexible three-state Zoomies pack and the complete pet-v2 atlas. Unknown fields, executable hooks, URLs, path traversal, symlinks, nonregular files, corrupt or truncated PNG containers, invalid checksums, empty frames, opaque backgrounds, oversized data, bad grids, overlaps, and missing states are rejected.
+Verified on the connected Apple Silicon Mac on 29 October 2026.
 
 ## Automated checks
 
-**25 XCTest cases passed with zero failures** on an Apple Silicon Mac using the installed Swift compiler. Tests generate synthetic image data and cover:
+**34 XCTest cases passed with zero failures.** They cover the existing strict SpritePack loader and route, plus the new motion routines and local launch requests:
 
-- Route bounds, closure, heading, pacing, invalid progress, and multiple display geometries.
-- Wide and tall custom artwork, plus three staggered route phases without discontinuities.
-- Complete native packs with different direction counts and rates; canonical packaging and round-trip loading.
-- Complete v2 packs with all 73 poses, required state/count mappings, and transparent unused cells.
-- The malformed, incomplete, corrupt, and unsafe inputs listed above.
+- Closed paths, smooth endpoints, pacing, finite headings, portrait/offset/tiny display bounds, and three performer phases.
+- Compact circles that use both authored directions, upright nonzero-width turns, six grounded prance hops, and safe invalid progress.
+- Round-trip control URLs, local paths containing spaces/Unicode/query punctuation, and rejection of unknown or duplicate fields and ambiguous selections.
+- Complete simple and 73-pose pet-v2 packs; image/grid/frame validation; corrupt, incomplete, oversized, nonregular, symlinked, escaping, or executable inputs.
 
-## Build and CLI integration
+All three bundled packs—Loki, Beagle, and Whippet—passed the actual validator with their five authored jumping poses. The original structural and custom-pack coverage is retained.
 
-All three ready default packs, Robot Loki, Beagle, and Whippet, passed the actual standalone validator.
+## Launcher and installation
 
-The validator returned exit 0 for a complete synthetic pack and exit 1 with an actionable missing-direction error for an incomplete pack. The same incomplete pack failed the build gate and left the existing archive and app-path file unchanged.
+The native app and bundled launcher compiled successfully. The app and both bundled helpers passed code-signature verification in the test build. The launcher reported version 1.3.0. The final app was installed in ~/Applications with its symlink in ~/.local/bin; both the installed launch command and playground opened successfully. The bundled setup prompt matched the canonical resource and the full guide exactly, and the native Copy setup prompt button confirmed a successful clipboard write.
 
-A customized Sample app compiled successfully, used its declared display name and bundle id, contained only the normalized manifest and PNG from the input folder, passed strict code-signature verification, and exported three GIF previews without opening a desktop window. Unrelated input files were not bundled.
+A temporary installation with spaces in both app and command paths worked from outside the checkout. The symlink resolved its own app correctly. A custom starter folder containing spaces and `&` was created and validated; asking that simple pack to prance failed with an actionable missing-jumping-poses message. Existing pack contents were preserved on a repeated creation attempt. The installer refused an unrelated command and an unrelated file at the app destination, preserving both.
 
-The default app compiled successfully, packaged all three ready characters, and passed strict code-signature verification. The build operates in a new staging directory and does not replace or quit a running app.
+## Motion and desktop evidence
 
-## Runtime behavior and limits
+The playground opened as a normal Mac window with the whole pack selected and the three move choices. Commands launched prancing, paused it, and reported the running process. A native overlay capture showed all three dogs together using their jumping artwork.
 
-The version 1.2 app was opened with --all-ready on the connected Apple Silicon Mac. Its own diagnostics reported three characters, a visible click-through window, an active lap animation, and gentle repeat enabled. Native window captures taken at different times showed Loki, Beagle, and Whippet together, with changed positions and running poses, followed by their resting poses. The app was left running. Individual menu interactions still require separate desktop verification.
+The offscreen exporter rendered [little circles](previews/all-dogs-circle.gif) and [happy prancing](previews/all-dogs-prance.gif) using the same MotionRoutine poses as the live compositor. Six-frame storyboards were inspected for all three dogs. These are choreography previews, not frame-rate benchmarks.
 
-All ready characters share one click-through panel and one Core Animation clock. Only one animation-completion callback schedules the group's rest timer. Character selection and imported folder choices are stored locally. No current Dot-avatar state is changed.
+All performers share one click-through panel, one Core Animation clock, and one completion callback. The existing sleep, display, pause, and Reduce Motion handling remains in place. A debugger check observed a normal Quit action from the paw menu, with no crash. The red window-close button removed the playground while leaving the overlay available.
 
-The structural validator cannot prove artistic identity, gait quality, correct gaze, or smooth semantic transitions. Beagle's visual-review notes about approximate intermediate gazes and two direction transitions are retained in ARTWORK.md. In-place circling and prancing-hop playback are planned follow-up work and are not implemented.
+## Limits
 
-Physical multi-display hot-plug, VoiceOver interaction, Intel execution, every supported macOS version, individual menu interactions, and Instruments frame-time or energy measurements remain unverified. No sustained FPS, memory, or energy-use claim is made.
+The validator cannot prove a dog's identity, artistic quality, or gait realism. The agent setup prompt explicitly requires actual dog artwork and visual review, and identifies any unperformed validation or playback check. The simple pack supports runs and circles; prancing requires a complete pet-v2 pack.
+
+Physical multi-display hot-plug, VoiceOver interaction, Intel execution, every supported macOS version, and Instruments frame-time or energy measurements remain unverified. No sustained FPS, memory, or energy-use claim is made. The app is locally signed, not Developer ID signed or notarized.

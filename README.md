@@ -1,98 +1,114 @@
-# LokiDot Zoomies
+# LokiDot Zoomies 🐾
 
-A small native macOS desktop pet. Bring your own complete sprite pack, validate it locally, and build a customized app. Pets run left, dip lower, race right, curve down through a loop, then sweep left and up.
+Good dogs. Big zoomies. A small native Mac app that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
 
-**Version 1.2 includes a standalone sprite validator, a Character menu, and Show All Ready Characters.** Loki, Beagle, and the line-drawing Whippet are complete, validated defaults.
+**Version 1.3:** a normal app window, a friendly `lokidot` command, little circles, and happy prancing. Pick one dog or let the whole pack loose.
 
-## Validate your sprites first
+![Loki, Beagle, and Whippet taking little circles together](docs/previews/all-dogs-circle.gif)
 
-Requires macOS 13+ and Xcode 15+ with its command-line tools selected. No third-party packages, downloads, server, or account are needed.
+[Watch the happy-prance preview](docs/previews/all-dogs-prance.gif).
+
+## Let them out
+
+**Just want to play?** Download the Apple Silicon app from [GitHub Releases](https://github.com/ashrocket/lokidot-zoomies/releases/latest), unzip it, move **LokiDot Zoomies.app** into `~/Applications`, and open it. The release app does not need Xcode. It is locally signed and not notarized; macOS may ask you to review the app before opening it.
+
+To add the command after installing the downloaded app:
+
+```sh
+APP="$HOME/Applications/LokiDot Zoomies.app"
+"$APP/Contents/Resources/install.sh" --from "$APP"
+lokidot
+```
+
+**Building from source?** Follow this route:
+
+On a Mac with **macOS 13+ and Xcode 15+** (with its command-line tools selected):
 
 ```sh
 git clone https://github.com/ashrocket/lokidot-zoomies.git
 cd lokidot-zoomies
-./scripts/validate-pack.sh /path/to/my-pet
+./lokidot install
+lokidot
 ```
 
-A pack is a folder containing **manifest.json plus one transparent PNG**. The validator prints VALID and exits 0 only when the entire declared set passes. Invalid packs print a specific error and exit 1; incorrect command usage exits 2. The app importer and build use this same validator.
+The installer puts **LokiDot Zoomies.app** in `~/Applications` and the command in `~/.local/bin`. If your shell doesn't already include that directory, the installer prints the one-line PATH command to use. You can always run `~/.local/bin/lokidot` directly.
 
-Choose a template:
+Prefer clicking? Open **LokiDot Zoomies** in Finder, Spotlight, or the Dock. The playground has a dog picker, a move picker, **Let’s go!**, **Pause**, and **Add your dog…**. Closing that window leaves the dogs playing; reopen the app or use the paw menu to get the controls back.
 
-- [zoomies-v1 manifest](examples/zoomies-v1/manifest.json): requires idle, running-right, and running-left. Declare your own cell size, frame counts, and playback rates.
-- [pet-v2 manifest](examples/pet-v2/manifest.json): requires all nine standard animation rows plus sixteen look directions in a 1536 × 2288 atlas.
+Already built it? `./lokidot` launches without rebuilding. `./lokidot build` makes a fresh build, and `./lokidot install --no-build` installs that build. `dist/LokiDot Zoomies.zip` contains the app for distribution. No `cat dist/app-path.txt` incantation needed.
 
-Copy the appropriate manifest into your pack folder, set id and name, and supply the PNG named by image. **No missing poses are invented, mirrored, or replaced with Loki.** See the [complete schema, limits, examples, and error guide](docs/sprite-packs.md).
+The app is locally signed, not Developer ID signed or notarized. Respect macOS security prompts; the installer does not disable security settings or remove quarantine attributes. No server, account, third-party packages, login item, or Accessibility permission is required.
 
-For an explicitly synthetic, MIT-licensed test pack you can replace with your own artwork:
+## A few good commands
 
 ```sh
-./scripts/make-sample-pack.sh local-assets/my-pet
-./scripts/validate-pack.sh local-assets/my-pet
+lokidot all                 # The whole pack, one app
+lokidot all circle          # Three dogs, little loops
+lokidot all prance          # A small synchronized celebration
+lokidot zoomies beagle      # Beagle gets the stage
+lokidot circle whippet      # Whippet takes a turn
+lokidot pause
+lokidot resume
+lokidot quit                # Everyone goes for a nap
 ```
 
-## Build and open
+`lokidot` opens the playground. `lokidot status` checks whether the app is running. Commands go to the existing app, so you don't need to quit and relaunch just to change a move. When switching to a different build, the launcher asks the older copy to close normally.
+
+| Move | What you'll see |
+| --- | --- |
+| **Big zoomies** | A broad, curved desktop lap with gentle acceleration and braking. |
+| **Little circles** | Two compact loops, a touch of depth, and soft transitions between the authored left and right poses. Dogs stay upright and visible. |
+| **Happy prance** | Six small hops, using each dog's actual jumping frames, with soft landings and a short stagger across the pack. |
+
+The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**, and **Repeat gently**. A move plays once, then rests for 24 seconds before repeating. Turn off **Repeat gently** for one take. macOS **Reduce Motion** keeps the pets still. Sleep and inactive login sessions hide and pause the overlay.
+
+The desktop overlay is transparent and click-through. Your normal work stays clickable.
+
+## Bring your own best friend
+
+**Your photo → your agent → your dog on the desktop.**
+
+1. In the playground, click **Copy setup prompt**.
+2. Paste it into your agent, attach a clear full-body photo, and give your dog's name.
+3. Let the agent make the actual artwork and pack, validate it, and show you a preview.
+4. Click **Add your dog…** and choose the finished folder. Keep that folder somewhere permanent.
+
+The copyable prompt contains the exact grid, manifest fields, validation commands, and launch steps. It tells the agent to deliver working files and an honest validation result. Use an agent with image-generation and file tools; a photo alone is not an animation pack.
+
+From Terminal, copy the same prompt with:
 
 ```sh
-# Validate and bundle your own pet, name, timing, and app identifier:
-./scripts/build.sh --pack /path/to/my-pet
-
-# Or build the ready defaults:
-./scripts/build.sh
-
-# Open the app when you are ready:
-open "$(cat dist/app-path.txt)"
-
-# Start all three ready characters together:
-open "$(cat dist/app-path.txt)" --args --all-ready
+lokidot dog-prompt | pbcopy
 ```
 
-Builds fail before packaging incomplete packs. A successful build creates an optimized, locally signed app at the printed staging path and saves dist/LokiDot Zoomies.zip. Building does not quit, replace, or launch a running pet. Quit the older version deliberately before opening a replacement. scripts/run.sh accepts the same --pack argument and combines build with open.
+Read the [step-by-step dog guide and copy the complete agent prompt](docs/your-dog.md). It includes photo advice, what the finished folder should contain, a drawing guide, and fixes for common problems.
 
-For a permanent installation, unzip the archive and move the app into Applications using Finder. Staging outside synced folders prevents File Provider metadata from invalidating the ad-hoc signature. The app is not Developer ID signed or notarized; respect macOS security prompts. No script changes security settings or removes quarantine attributes.
+Prefer to make the art yourself? Start with `lokidot new-dog FOLDER NAME`, replace the practice sprite, and run `lokidot validate FOLDER`. Then `lokidot dog FOLDER circle` lets them out. See the [exact format and validator rules](docs/sprite-packs.md).
 
-A customized app includes the validated pack's name, frame timing, proportions, and a separate bundle identifier derived from its id. Its archive also includes the ready defaults. Arbitrary files alongside a manifest are not copied.
+The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. All three bundled dogs already have them.
 
-## Characters and controls
+## Make it yours, or make it better
 
-- **Character → Loki / Beagle / Whippet** selects a validated default.
-- **Character → Show All Ready Characters** runs the ready defaults together in one transparent window, spaced along the same route. It becomes available with at least two ready defaults. Pause, repeat, Reduce Motion, and display selection apply to the group.
-- **Character → Import Sprite Pack…** validates a local pack before switching. Invalid imports keep the current character. The chosen character or imported folder is remembered locally; a missing saved pack produces an error instead of silently substituting another pet.
-- **Zoomies!** starts one lap while resting. A lap takes 16 seconds; **Repeat gently** defaults on with 24 seconds of rest between laps. Uncheck it for a single lap.
-- **Pause / Resume** freezes travel and sprite playback together.
-- **Display** selects a connected screen and keeps each pet inside its usable bounds.
-- macOS **Reduce Motion** keeps all pets still. Screen sleep and inactive login sessions pause and hide the overlay.
-- Quit with the **paw menu → Quit LokiDot Zoomies**. Quit has no keyboard shortcut.
+PRs are welcome: new dog packs with clear artwork rights, better movement, accessibility improvements, and small quality-of-life fixes are all good places to start.
 
-The overlay is transparent, nonactivating, and click-through. It has no login item, network listener, telemetry, third-party dependency, Accessibility requirement, or screen-recording requirement. It does not change the existing Dot avatar.
+```sh
+./lokidot test
+./lokidot build
+./lokidot all circle
 
-## Ready artwork and previews
+# Validate before sharing a pack:
+./scripts/validate-pack.sh /path/to/your-dog
 
-| Character | Full sprite pack | Running preview |
+# Build a separately identified app around your own dog:
+./scripts/build.sh --pack /path/to/your-dog
+```
+
+The [architecture guide](docs/ARCHITECTURE.md) explains the motion model, rendering clock, command routing, and install flow. The [verification record](docs/VERIFICATION.md) distinguishes tested behavior from remaining limits.
+
+| Ready dog | Full pack | Running preview |
 | --- | --- | --- |
-| Robot Loki | [Atlas](Resources/Characters/robot-loki/atlas.png) · [manifest](Resources/Characters/robot-loki/manifest.json) | [GIF](docs/previews/robot-loki-running.gif) |
+| Loki | [Atlas](Resources/Characters/robot-loki/atlas.png) · [manifest](Resources/Characters/robot-loki/manifest.json) | [GIF](docs/previews/robot-loki-running.gif) |
 | Beagle | [Atlas](Resources/Characters/beagle/atlas.png) · [manifest](Resources/Characters/beagle/manifest.json) | [GIF](docs/previews/beagle-running.gif) |
 | Whippet | [Atlas](Resources/Characters/whippet/atlas.png) · [manifest](Resources/Characters/whippet/manifest.json) | [GIF](docs/previews/whippet-running.gif) |
 
-See [artwork provenance and review notes](docs/ARTWORK.md). User imports remain local unless you choose to distribute the built app or archive; those bundles contain the imported artwork. local-assets/, .build/, and dist/ are ignored by Git.
-
-## Checks and previews
-
-```sh
-./scripts/test.sh
-
-# After a build, export declared animations without opening an overlay:
-"$(cat dist/app-path.txt)/Contents/MacOS/LokiDotZoomies" \
-  --pack /path/to/my-pet --render-preview local-assets/previews
-```
-
-The tests generate synthetic PNG fixtures and cover complete and incomplete packs, v2 rows, malformed JSON, unknown fields, corrupt/disguised images, symlinks, path traversal, nonregular files, transparency, bounds, size limits, and multi-pet route phases. No private test artwork is required.
-
-The validator checks structure and pixels, not whether a gait, expression, or look direction is artistically correct. Review the GIFs and all poses yourself. This desktop app currently plays the two locomotion rows and uses the first idle frame while resting. It validates and preserves the other v2 states for portability; it does not yet animate in-place circles or prancing hops.
-
-The Swift package also exposes SpritePackTool for Xcode / swift run. Optional app flags are --pack, --all-ready, --render-preview, --reduce-motion, and --diagnostics. --all-ready starts the bundled characters together for this launch; it cannot be combined with --pack. Raw --spritesheet and LOKIDOT_SPRITESHEET imports have been replaced by manifest-based packs.
-
-See [verification and current limits](docs/VERIFICATION.md).
-
-## License
-
-Original code, synthetic fixtures, and the bundled artwork supplied for this release are [MIT licensed](LICENSE). Other artwork you import retains its own license. This is an independent desktop toy, not an official OpenAI app.
+Original code, synthetic fixtures, and bundled artwork for this release are [MIT licensed](LICENSE). Imported artwork retains its own license. See [artwork provenance](docs/ARTWORK.md). LokiDot is an independent desktop toy, not an official OpenAI app, and does not change your existing Dot avatar.

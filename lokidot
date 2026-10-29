@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+case "${1:-}" in
+  build) shift; exec "$ROOT/scripts/build.sh" "$@" ;;
+  install) shift; exec "$ROOT/scripts/install.sh" "$@" ;;
+  test) shift; exec "$ROOT/scripts/test.sh" "$@" ;;
+esac
+APP=""
+if [[ -f "$ROOT/dist/app-path.txt" ]]; then APP="$(cat "$ROOT/dist/app-path.txt")"; fi
+if [[ ! -x "$APP/Contents/MacOS/lokidot" ]]; then
+  APP="$HOME/Applications/LokiDot Zoomies.app"
+fi
+if [[ ! -x "$APP/Contents/MacOS/lokidot" ]]; then
+  "$ROOT/scripts/build.sh"
+  APP="$(cat "$ROOT/dist/app-path.txt")"
+fi
+exec "$APP/Contents/MacOS/lokidot" "$@"

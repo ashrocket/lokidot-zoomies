@@ -13,7 +13,7 @@ func summary(_ pack: SpritePack) -> String {
 }
 
 /// Explicit synthetic test artwork; never used as a fallback character.
-func makeSample(at destination: URL) throws {
+func makeSample(at destination: URL, name: String = "Sample") throws {
     let cell = 64, columns = 4, rows = 3
     guard let context = CGContext(data: nil, width: cell * columns, height: cell * rows,
         bitsPerComponent: 8, bytesPerRow: cell * columns * 4, space: CGColorSpaceCreateDeviceRGB(),
@@ -41,7 +41,10 @@ func makeSample(at destination: URL) throws {
     }
     CGImageDestinationAddImage(output, image, nil)
     guard CGImageDestinationFinalize(output) else { throw SpritePackError("Could not finish the synthetic fixture.") }
-    let manifest = SpritePackManifest(format: "zoomies-v1", id: "sample", name: "Sample",
+    let slug = name.lowercased().replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    let identifier = String((slug.first?.isLetter == true ? slug : "dog-" + slug).prefix(32))
+    let manifest = SpritePackManifest(format: "zoomies-v1", id: identifier, name: name,
         image: "atlas.png", frameWidth: cell, frameHeight: cell, animations: [
             "idle": SpriteAnimation(row: 0, frameCount: 1, fps: 1),
             "running-right": SpriteAnimation(row: 1, frameCount: 4, fps: 8),
@@ -82,8 +85,8 @@ do {
         try pack.write(to: folder(args[2]))
         print(summary(pack))
     case "sample":
-        guard args.count == 2 else { throw SpritePackError("Usage: SpritePackTool sample NEW_FOLDER") }
-        try makeSample(at: folder(args[1]))
+        guard (2...3).contains(args.count) else { throw SpritePackError("Usage: SpritePackTool sample NEW_FOLDER [NAME]") }
+        try makeSample(at: folder(args[1]), name: args.count == 3 ? args[2] : "Sample")
     default:
         throw SpritePackError("Unknown command \(command). Use validate, copy, bundle, or sample.")
     }
