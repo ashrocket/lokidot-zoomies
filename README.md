@@ -1,8 +1,17 @@
 # LokiDot Zoomies 🐾
 
-Good dogs. Big zoomies. A small native Mac app that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
+**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-1.3.1-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-win-x64.msi)**
 
-**Version 1.3:** a normal app window, a friendly `lokidot` command, little circles, and happy prancing. Pick one dog or let the whole pack loose.
+| Installer | Requirements | Version |
+| --- | --- | --- |
+| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-1.3.1-macos-arm64.pkg) | Apple silicon, macOS 13+ | 1.3.1 |
+| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 0.1.0 preview |
+
+[Release notes, portable ZIPs, and SHA-256 checksums](https://github.com/ashrocket/lokidot-zoomies/releases/tag/v1.3.1). Both installers are unsigned; the Mac app is locally signed but not notarized. Review your operating system's security prompts. The Windows preview passed automated installer and app checks; interactive desktop testing is still pending. [Windows details](windows/README.md).
+
+Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
+
+**Mac version 1.3.1:** a normal app window, a friendly `lokidot` command, little circles, happy prancing, a whippet icon, and a PKG installer. Pick one dog or let the whole pack loose. Add custom artwork through **Add your dog…**; the downloads contain the standard dogs.
 
 ![Loki, Beagle, and Whippet taking little circles together](docs/previews/all-dogs-circle.gif)
 
@@ -10,7 +19,9 @@ Good dogs. Big zoomies. A small native Mac app that lets Loki, a beagle, an illu
 
 ## Let them out
 
-**Just want to play?** Download the app from [GitHub Releases](https://github.com/ashrocket/lokidot-zoomies/releases/latest). If the release includes a `.pkg`, quit Zoomies and open the installer: it installs **LokiDot Zoomies.app** in your `~/Applications` folder without an administrator account. The ZIP remains available: unzip it and move the app there yourself. Match the download to your Mac's architecture. The app does not need Xcode. It is locally signed and not notarized; macOS may ask you to review it before opening.
+**Just want to play on a Mac?** Use the **Mac PKG** link above. Quit Zoomies and open the installer: it installs **LokiDot Zoomies.app** in your `~/Applications` folder without an administrator account. The ZIP remains available: unzip it and move the app there yourself. The downloads target Apple silicon; Intel Mac owners can build from source below. The downloaded app does not need Xcode.
+
+**On Windows?** Open the **Windows MSI** above and launch **LokiDot Zoomies** from the Start Menu. It installs for your current user and includes its .NET runtime. See the [Windows preview guide](windows/README.md) for portable use, building, and current limitations.
 
 To add the command after installing the downloaded app:
 
