@@ -34,5 +34,5 @@ Preview with `lokidot dog "PACK_FOLDER" circle`, then try zoomies. You can also 
 If you cannot run the Mac app, say so and give me the exact local commands; don't claim live playback was verified.
 
 5. Hand me the finished result.
-Give me the exact pack folder, manifest.json, atlas.png, a preview, and the validation result. Explain: open LokiDot Zoomies, click "Add your dog…", and choose the FOLDER containing those two files. Keep it somewhere permanent because the app remembers that location. Include a correctly quoted launch command for my exact folder.
+Give me the exact pack folder, manifest.json, atlas.png, a preview, and the validation result. Explain: open LokiDot Zoomies, click "Add your dog…", and choose the FOLDER containing those two files. Mac builds with "Saved pets…" save their own copy, remember loaded pets across launches, and let me unload or remove saved copies. Keep my original pack as a backup. Older builds and the Windows preview still need the original folder to stay in place. Include a correctly quoted launch command for my exact folder.
 Only describe the dog as ready after its actual artwork is in place and validation has passed. Do not publish my photos or pack; I will decide if I want to share them.

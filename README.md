@@ -102,7 +102,7 @@ Keep Zoomies running and the Mac awake. This feature is not in the published 1.3
 1. In the playground, click **Copy setup prompt**.
 2. Paste it into your agent, attach a clear full-body photo, and give your dog's name.
 3. Let the agent make the actual artwork and pack, validate it, and show you a preview.
-4. Click **Add your dog…** and choose the finished folder. Keep that folder somewhere permanent.
+4. Click **Add your dog…** and choose the finished folder. The Mac source build saves a local copy; keep the original as a backup. Published 1.3.2 builds and the Windows preview still need the original folder in place.
 
 The copyable prompt contains the exact grid, manifest fields, validation commands, and launch steps. It tells the agent to deliver working files and an honest validation result. Use an agent with image-generation and file tools; a photo alone is not an animation pack.
 
@@ -115,6 +115,18 @@ lokidot dog-prompt | pbcopy
 Read the [step-by-step dog guide and copy the complete agent prompt](docs/your-dog.md). It includes photo advice, what the finished folder should contain, a drawing guide, and fixes for common problems.
 
 Prefer to make the art yourself? Start with `lokidot new-dog FOLDER NAME`, replace the practice sprite, and run `lokidot validate FOLDER`. Then `lokidot dog FOLDER circle` lets them out. See the [exact format and validator rules](docs/sprite-packs.md).
+
+### Keep a pack, put a pet away
+
+The Mac source build has **Saved pets…** in the playground and paw menu. Imports are saved outside the app, restored on launch, and included in **The whole pack** while loaded. **Unload pet** keeps a pet saved for later. **Remove saved copy…** moves only LokiDot's copy to Trash, leaving your original folder untouched. **Put pets away** clears the desktop and stays off across launches until you choose **Let’s go!** or resume.
+
+```sh
+lokidot pets       # Load, unload, or remove saved imports
+lokidot unload     # Put all pets away without deleting them
+lokidot resume     # Bring the current selection back
+```
+
+[Saved-pet storage, duplicate imports, and recovery](docs/saved-pets.md). This feature is not in the published 1.3.2 downloads or Windows preview yet.
 
 The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. Loki, Beagle, and Whippet have them; Loki Vampire currently runs and circles. Choose an individual pet-v2 dog to prance, since the whole pack now includes the vampire.
 

@@ -3,7 +3,7 @@ import XCTest
 
 final class LaunchRequestTests: XCTestCase {
     func testEveryActionAndMotionRoundTrips() throws {
-        for action in [LaunchRequest.Action.show, .play, .pause, .resume, .quit, .calendars, .alarmTest] {
+        for action in [LaunchRequest.Action.show, .play, .pause, .resume, .quit, .calendars, .alarmTest, .pets, .unload] {
             let request = try LaunchRequest(action: action)
             XCTAssertEqual(try LaunchRequest(url: request.url), request)
         }
@@ -26,7 +26,8 @@ final class LaunchRequestTests: XCTestCase {
                     "lokidot://user@control/play", "lokidot://control/play#commands",
                     "lokidot://control/play?diagnostics=/tmp/report", "lokidot://control/play?character=",
                     "lokidot://control/quit?character=all", "lokidot://control/calendars?character=all",
-                    "lokidot://control/alarm-test?motion=circle", "lokidot://control/calendars?enable=true"] {
+                    "lokidot://control/alarm-test?motion=circle", "lokidot://control/calendars?enable=true",
+                    "lokidot://control/pets?pack=/tmp/dog", "lokidot://control/unload?character=all"] {
             XCTAssertThrowsError(try LaunchRequest(url: URL(string: url)!), url)
         }
     }

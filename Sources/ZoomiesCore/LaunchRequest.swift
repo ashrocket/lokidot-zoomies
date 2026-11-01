@@ -3,7 +3,7 @@ import Foundation
 /// The only commands accepted from a local launch URL. No executable text,
 /// network resource, diagnostics destination, or arbitrary setting is accepted.
 public struct LaunchRequest: Equatable {
-    public enum Action: String { case show, play, pause, resume, quit, calendars; case alarmTest = "alarm-test" }
+    public enum Action: String { case show, play, pause, resume, quit, calendars, pets, unload; case alarmTest = "alarm-test" }
     public let action: Action
     public let motion: MotionStyle?
     public let character: String?

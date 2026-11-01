@@ -41,6 +41,12 @@ The bundled **lokidot** executable locates its containing app even when invoked 
 
 The command validates an imported dog before requesting playback. The app validates again before replacing its current character. A malformed or incomplete pack cannot partially change the selection. The app remembers successful choices locally.
 
+## Saved pet library on Mac
+
+**SavedPetLibrary** writes validated manifest/PNG snapshots under the app's Application Support directory. Imports commit via a private staging folder and atomic move. Canonical content hashes give imports independent IDs, deduplicate identical packs, and prevent a user manifest ID from replacing a bundled character. Listing isolates broken entries; loading and removal reject foreign IDs and symbolic-link folders. Removal delegates only a managed child to macOS Trash.
+
+AppDelegate combines bundled characters with loaded saved imports. It remembers unloaded IDs, the selected character, whole-pack selection, and whether pets are put away. A legacy remembered folder is migrated after successful validation and copying; the source folder is preserved. **SavedPetsWindow** exposes load/unload/remove. `lokidot pets` opens it; `lokidot unload` hides the overlay and stops repeat timers without removing files. Reopening the playground does not undo an unload.
+
 `status` checks the app process; its output is not a claim about which move is playing. Successful launch-command output confirms macOS accepted delivery. The app's diagnostics and visible controls establish playback state.
 
 ## Movement and rendering
