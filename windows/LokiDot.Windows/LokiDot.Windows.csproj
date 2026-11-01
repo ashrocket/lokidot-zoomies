@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>LokiDot.Zoomies</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>1.3.2</Version>
   </PropertyGroup>
   <!-- Deliberate allowlist: never glob private packs or footage. -->
   <ItemGroup>
@@ -19,6 +19,9 @@
     </Content>
     <Content Include="../../Resources/Characters/robot-loki/manifest.json;../../Resources/Characters/robot-loki/atlas.png">
       <Link>Characters/robot-loki/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../../Resources/Characters/loki-vampire/manifest.json;../../Resources/Characters/loki-vampire/atlas.png">
+      <Link>Characters/loki-vampire/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 </Project>

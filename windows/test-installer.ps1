@@ -9,6 +9,18 @@ $evidence = Join-Path $run 'evidence'
 Set-Content -LiteralPath "$Artifacts/evidence-path.txt" -Value $evidence -NoNewline
 New-Item -ItemType Directory -Force $evidence | Out-Null
 $msi = Join-Path $run 'LokiDot-Zoomies-win-x64.msi'
+$checksums = @(Get-Content -LiteralPath "$run/SHA256.txt")
+if ($checksums.Count -ne 2) { throw 'Expected two portable SHA-256 entries' }
+$checksumNames = @()
+foreach ($line in $checksums) {
+    if ($line -notmatch '^([a-f0-9]{64})  (LokiDot-Zoomies-win-x64\.(zip|msi))$') { throw "Invalid portable SHA-256 entry: $line" }
+    $expectedHash = $Matches[1]
+    $filename = $Matches[2]
+    $checksumNames += $filename
+    $actualHash = (Get-FileHash -LiteralPath (Join-Path $run $filename)).Hash.ToLowerInvariant()
+    if ($actualHash -ne $expectedHash) { throw "Checksum mismatch: $filename" }
+}
+if (($checksumNames | Sort-Object -Unique).Count -ne 2) { throw 'Checksum file must name both the ZIP and MSI exactly once' }
 $installed = Join-Path $env:ProgramFiles 'LokiDot Zoomies Preview'
 $exe = Join-Path $installed 'LokiDot.Zoomies.exe'
 $shortcut = Join-Path $env:ProgramData 'Microsoft/Windows/Start Menu/Programs/LokiDot Zoomies Preview/LokiDot Zoomies Preview.lnk'

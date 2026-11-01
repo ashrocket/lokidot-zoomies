@@ -122,4 +122,4 @@ The Character menu remembers the chosen id, or the local folder for an imported 
 
 Version 1.3 supports broad zoomies, compact upright circles, and prancing hops. Both formats can run and circle using their authored left and right running poses. A complete pet-v2 pack also supplies the jumping poses used by prancing; the simple zoomies-v1 format does not enable that move.
 
-Circles blend the two running directions with modest banking and depth changes. This is not a 3D body turntable. The v2 look frames represent gaze and are never used to spin a dog upside down. All three bundled dogs have the required jumping artwork.
+Circles blend the two running directions with modest banking and depth changes. This is not a 3D body turntable. The v2 look frames represent gaze and are never used to spin a dog upside down. Bundled Loki, Beagle, and Whippet have the required jumping artwork. Loki Vampire is a simple pack for zoomies and circles, so choose one of the pet-v2 dogs for prancing.

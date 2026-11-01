@@ -13,7 +13,7 @@ A **sprite pack** is a folder containing a sheet of little dog poses and a file 
 5. **Let them out.** In LokiDot, click **Add your dog…** and choose the finished **folder**, not the photo or PNG. Or run the exact `lokidot dog "..." circle` command your agent gives you.
 6. **Keep their home.** Store the pack somewhere permanent. The app remembers that folder; if you move it later, import the new location.
 
-The first pack supports **Big zoomies** and **Little circles**. **Happy prance** needs the full pet-v2 format with jumping artwork. The three bundled dogs already have those poses.
+The first pack supports **Big zoomies** and **Little circles**. **Happy prance** needs the full pet-v2 format with jumping artwork. Bundled Loki, Beagle, and Whippet have those poses; the optional Loki Vampire character runs and circles.
 
 ## Copy this whole prompt to your agent
 

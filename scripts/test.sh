@@ -8,6 +8,8 @@ SNAPSHOT="$(mktemp -d "${TMPDIR:-/tmp}/LokiDot-tests.XXXXXX")"
 trap 'rm -rf "$SNAPSHOT"' EXIT
 cp -R Sources/ZoomiesCore Tests/ZoomiesCoreTests "$SNAPSHOT/"
 cp scripts/TestRunner.swift "$SNAPSHOT/TestRunner.swift"
+cp Sources/LokiDotZoomies/UpdateTransport.swift "$SNAPSHOT/UpdateTransport.swift"
+cp scripts/test-update-staging.swift "$SNAPSHOT/test-update-staging.swift"
 mkdir -p "$SNAPSHOT/build"
 DEVELOPER_FRAMEWORKS="$(xcrun --show-sdk-platform-path)/Developer/Library/Frameworks"
 DEVELOPER_LIBRARIES="$(xcrun --show-sdk-platform-path)/Developer/usr/lib"
@@ -24,3 +26,8 @@ xcrun swiftc -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
   "$SNAPSHOT"/ZoomiesCoreTests/*.swift "$SNAPSHOT/TestRunner.swift" "$SNAPSHOT/build/ZoomiesCore.o" \
   -o "$SNAPSHOT/build/MotionTests"
 "$SNAPSHOT/build/MotionTests"
+# Offline regression checks for the actual staged-file verifier. Never opens Installer.
+xcrun swiftc -module-cache-path "$CLANG_MODULE_CACHE_PATH" -I "$SNAPSHOT/build" \
+  "$SNAPSHOT/UpdateTransport.swift" "$SNAPSHOT/test-update-staging.swift" "$SNAPSHOT/build/ZoomiesCore.o" \
+  -o "$SNAPSHOT/build/UpdateStagingTests"
+"$SNAPSHOT/build/UpdateStagingTests"

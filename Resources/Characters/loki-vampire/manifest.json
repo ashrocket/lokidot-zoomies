@@ -1,0 +1,29 @@
+{
+  "animations": {
+    "idle": {
+      "column": 0,
+      "fps": 1,
+      "frameCount": 1,
+      "row": 0
+    },
+    "running-left": {
+      "column": 0,
+      "fps": 8,
+      "frameCount": 4,
+      "row": 2
+    },
+    "running-right": {
+      "column": 0,
+      "fps": 8,
+      "frameCount": 4,
+      "row": 1
+    }
+  },
+  "format": "zoomies-v1",
+  "frameHeight": 256,
+  "frameWidth": 256,
+  "id": "loki-vampire",
+  "image": "atlas.png",
+  "name": "Loki Vampire",
+  "schemaVersion": 1
+}

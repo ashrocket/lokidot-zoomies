@@ -1,5 +1,5 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="LokiDot Zoomies Preview" Manufacturer="LokiDot" Version="0.1.0"
+  <Package Name="LokiDot Zoomies Preview" Manufacturer="LokiDot" Version="1.3.2"
            UpgradeCode="D632D395-894C-4B72-AF27-6DAAF6155D06" Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer LokiDot Zoomies preview is already installed." />
     <MediaTemplate EmbedCab="yes" />

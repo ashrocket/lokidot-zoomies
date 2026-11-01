@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private var characterItem: NSMenuItem!
     private var motionItem: NSMenuItem!
     private var playground: PlaygroundWindow?
+    private let updates = UpdateController()
     private var pendingRequests: [LaunchRequest] = []
     private var motionStyle = MotionStyle(rawValue: UserDefaults.standard.string(forKey: "motionStyle") ?? "") ?? .zoomies
     private var canPrance: Bool { !activeArtworks.isEmpty && activeArtworks.allSatisfy(\.canPrance) }
@@ -73,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         for request in pendingRequests { accept(request) }
         pendingRequests.removeAll()
         if !CommandLine.arguments.contains("--background") { showPlayground() }
+        updates.start()
 
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
@@ -373,7 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             } else if let id = request.character {
                 if id == "all" { all = true }
                 else if let selected = characters.first(where: { $0.pack.manifest.id == id }) { candidate = selected; all = false }
-                else { throw SpritePackError("That dog is unavailable. Try robot-loki, beagle, whippet, or all.") }
+                else { throw SpritePackError("That dog is unavailable. Try robot-loki, beagle, whippet, loki-vampire, or all.") }
             }
             let selectedStyle = request.motion ?? motionStyle
             let selectedPacks = all ? characters : candidate.map { [$0] } ?? []
@@ -426,14 +428,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     private func buildApplicationMenu() {
         let main = NSMenu(), appMenu = NSMenu(), root = NSMenuItem()
+        appMenu.autoenablesItems = false
         let show = NSMenuItem(title: "Show LokiDot Zoomies", action: #selector(showPlayground), keyEquivalent: "0")
         show.target = self; appMenu.addItem(show); appMenu.addItem(.separator())
+        updates.addMenuItems(to: appMenu)
+        appMenu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit LokiDot Zoomies", action: #selector(quit), keyEquivalent: "q")
         quit.target = self; appMenu.addItem(quit); root.submenu = appMenu; main.addItem(root)
         NSApp.mainMenu = main
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updates.stop()
         restTimer?.invalidate()
         overlay?.window.close()
     }
@@ -463,6 +469,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             item.target = self; item.representedObject = style.rawValue; moves.addItem(item)
         }
         motionItem.submenu = moves; menu.addItem(motionItem)
+        menu.addItem(.separator())
+        updates.addMenuItems(to: menu)
         menu.addItem(.separator())
         // A background pet should not consume Command-Q intended for another app.
         add("Quit LokiDot Zoomies", action: #selector(quit), key: "")
