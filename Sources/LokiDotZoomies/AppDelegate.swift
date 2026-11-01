@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private var motionItem: NSMenuItem!
     private var playground: PlaygroundWindow?
     private let updates = UpdateController()
+    private let calendarAlarms = CalendarAlarmController()
     private var pendingRequests: [LaunchRequest] = []
     private var motionStyle = MotionStyle(rawValue: UserDefaults.standard.string(forKey: "motionStyle") ?? "") ?? .zoomies
     private var canPrance: Bool { !activeArtworks.isEmpty && activeArtworks.allSatisfy(\.canPrance) }
@@ -35,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private var restDeadline: TimeInterval?
     private var restRemaining = MotionRoute.restDuration
     private var resumeAfterWake = false
+    private var screensAwake = true
+    private var userSessionActive = true
     private let forcedReducedMotion = CommandLine.arguments.contains("--reduce-motion")
     private var reducedMotion: Bool {
         forcedReducedMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -65,16 +68,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         center.addObserver(self, selector: #selector(displaysChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.addObserver(self, selector: #selector(accessibilityChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
-        workspace.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.screensDidSleepNotification, object: nil)
-        workspace.addObserver(self, selector: #selector(waking), name: NSWorkspace.screensDidWakeNotification, object: nil)
-        workspace.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
-        workspace.addObserver(self, selector: #selector(waking), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(sleeping(_:)), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(waking(_:)), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(sleeping(_:)), name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(waking(_:)), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
         configureDisplay()
         updateMenu()
         for request in pendingRequests { accept(request) }
         pendingRequests.removeAll()
         if !CommandLine.arguments.contains("--background") { showPlayground() }
         updates.start()
+        calendarAlarms.onPetAlert = { [weak self] in
+            // Reminders stay visible when pets are paused or Reduce Motion is on.
+            // Only a resting, unpaused pet starts a new lap.
+            guard let self, self.mode == .resting else { return }
+            self.startLap()
+        }
+        calendarAlarms.start()
 
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
@@ -202,7 +212,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         updateMenu()
     }
 
-    @objc private func sleeping() {
+    @objc private func sleeping(_ notification: Notification) {
+        if notification.name == NSWorkspace.screensDidSleepNotification { screensAwake = false }
+        else { userSessionActive = false }
+        calendarAlarms.setSessionActive(false)
         if mode == .running || mode == .resting {
             resumeAfterWake = true
             togglePause()
@@ -210,7 +223,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         overlay?.window.orderOut(nil)
     }
 
-    @objc private func waking() {
+    @objc private func waking(_ notification: Notification) {
+        if notification.name == NSWorkspace.screensDidWakeNotification { screensAwake = true }
+        else { userSessionActive = true }
+        guard screensAwake && userSessionActive else { return }
+        calendarAlarms.setSessionActive(true)
         overlay?.window.orderFrontRegardless()
         if resumeAfterWake {
             resumeAfterWake = false
@@ -361,6 +378,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private func accept(_ request: LaunchRequest) {
         switch request.action {
         case .quit: NSApp.terminate(nil); return
+        case .calendars: showCalendarAlarms(); return
+        case .alarmTest: calendarAlarms.testAlarm(); return
         case .pause:
             if mode == .running || mode == .resting { togglePause() }; return
         case .resume:
@@ -420,6 +439,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             }
             controller.onPause = { [weak self] in self?.togglePause() }
             controller.onImport = { [weak self] in self?.chooseArtwork() }
+            controller.onCalendars = { [weak self] in self?.showCalendarAlarms() }
             playground = controller
         }
         updateMenu()
@@ -431,6 +451,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         appMenu.autoenablesItems = false
         let show = NSMenuItem(title: "Show LokiDot Zoomies", action: #selector(showPlayground), keyEquivalent: "0")
         show.target = self; appMenu.addItem(show); appMenu.addItem(.separator())
+        let calendars = NSMenuItem(title: "Calendar alarms…", action: #selector(showCalendarAlarms), keyEquivalent: ",")
+        calendars.target = self; appMenu.addItem(calendars); appMenu.addItem(.separator())
         updates.addMenuItems(to: appMenu)
         appMenu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit LokiDot Zoomies", action: #selector(quit), keyEquivalent: "q")
@@ -439,6 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        calendarAlarms.stop()
         updates.stop()
         restTimer?.invalidate()
         overlay?.window.close()
@@ -452,6 +475,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
         add("Show playground…", action: #selector(showPlayground), key: "")
+        add("Calendar alarms…", action: #selector(showCalendarAlarms), key: "")
         menu.addItem(.separator())
         zoomiesItem = add("Zoomies!", action: #selector(zoomies), key: "z")
         pauseItem = add("Pause", action: #selector(togglePause), key: "p")
@@ -539,6 +563,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private func displayID(_ screen: NSScreen) -> CGDirectDisplayID {
         (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
     }
+
+    @objc private func showCalendarAlarms() { calendarAlarms.showSettings() }
 
     private func writeDiagnostics(to url: URL) {
         guard let overlay else { return }

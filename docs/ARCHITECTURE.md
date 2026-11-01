@@ -23,7 +23,15 @@ flowchart LR
 - **SpritePack** validates a local manifest and PNG, decodes a fixed snapshot, and exposes only declared frames. Unknown fields, unsafe file types, symlinks, traversal, invalid pixels, and incomplete packs are rejected. The app does not execute manifest contents.
 - **MotionRoute** builds the broad zoomies path, measures arc length, and supplies continuous tangents. It reserves space for the whole sprite on small, offset, wide, and portrait displays.
 - **MotionRoutine** turns progress into a pose for zoomies, circles, or prancing. Poses carry position, facing blend, bank, scale, gait time, and optional jump-frame progress. Every routine closes at its start, easing to rest at both ends.
-- **LaunchRequest** is a small, strictly validated command vocabulary. Local URLs accept only show, play, pause, resume, or quit, with a supported move and one dog selection. Unknown, duplicate, conflicting, and malformed options are rejected. Paths are encoded with URLComponents, not shell interpolation.
+- **LaunchRequest** is a small, strictly validated command vocabulary. Local URLs accept show, play, pause, resume, quit, calendars, or alarm-test. Only show/play accept a supported move and one dog selection. Calendar commands cannot grant access, enable alarms, or supply event data. Unknown, duplicate, conflicting, and malformed options are rejected. Paths are encoded with URLComponents, not shell interpolation.
+
+## Calendar alarms on Mac
+
+**CalendarAlarmController** adapts EventKit's local event store into value snapshots. Apple calendars and Google calendars synced through macOS use the same reader. Access is requested only by the explicit Connect calendars button. Disabled background alarms never fetch events. The app does not write to EventKit, authenticate directly with Google, or send calendar data over the network.
+
+**CalendarAlarmScheduler** in ZoomiesCore handles selected calendars, advance notice, recurring occurrence identity, duplicate prevention, snoozes, expiration and a two-minute catch-up window. It uses absolute dates rather than wall-clock arithmetic. Tests cover the autumn DST transition, recurrence, changed lead times, cancellation, restart persistence and absent events. Delivery receipts contain opaque identifiers/times, not titles.
+
+**CalendarAlarmWindow** provides opt-in settings and a permission-free test. **PetAlarmWindow** is a nonactivating card with Dismiss and Snooze. AppDelegate starts a lap only for an unpaused resting pet; Reduce Motion still applies. Sleep and inactive sessions hide the card. A minute refresh plus EventKit change notifications keeps a 24-hour snapshot current; a lightweight timer checks due reminders while the app is running. No launch agent or OS wake request is installed.
 
 ## One app, two ways to play
 

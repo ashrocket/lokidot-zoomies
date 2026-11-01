@@ -20,6 +20,8 @@
     </dict></array>
     <key>NSSupportsAutomaticTermination</key><false/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSCalendarsUsageDescription</key><string>LokiDot reads selected calendars so your pets can remind you about upcoming events. It never creates, edits, or deletes calendar events.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>LokiDot reads selected Apple and synced Google calendars for pet alarms. macOS requires full calendar access to read events; LokiDot never creates, edits, or deletes them.</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 LokiDot Zoomies contributors. MIT License.</string>
 </dict>

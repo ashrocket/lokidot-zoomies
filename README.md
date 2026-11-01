@@ -84,6 +84,17 @@ The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**,
 
 The desktop overlay is transparent and click-through. Your normal work stays clickable.
 
+## Let your pet remind you
+
+The Mac source build now has **Calendar alarms…** in the playground and paw menu. Connect Apple Calendar, select your calendars, and let your pet nudge you before an event. Google Calendar works through the Google account synced to Apple Calendar on your Mac. Choose an advance reminder, optional sound, and whether event titles appear; alerts have **Snooze 5 min** and **Dismiss**.
+
+```sh
+lokidot calendars    # Connect and choose calendars
+lokidot alarm-test   # Try an alert without calendar access
+```
+
+Keep Zoomies running and the Mac awake. This feature is not in the published 1.3.2 installers or Windows preview yet. [Calendar setup, Google sync, privacy, and alarm behavior](docs/calendar-alarms.md).
+
 ## Bring your own best friend
 
 **Your photo → your agent → your dog on the desktop.**

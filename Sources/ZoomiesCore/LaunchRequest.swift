@@ -3,7 +3,7 @@ import Foundation
 /// The only commands accepted from a local launch URL. No executable text,
 /// network resource, diagnostics destination, or arbitrary setting is accepted.
 public struct LaunchRequest: Equatable {
-    public enum Action: String { case show, play, pause, resume, quit }
+    public enum Action: String { case show, play, pause, resume, quit, calendars; case alarmTest = "alarm-test" }
     public let action: Action
     public let motion: MotionStyle?
     public let character: String?
@@ -26,7 +26,7 @@ public struct LaunchRequest: Equatable {
             }
         }
         guard action == .show || action == .play || (motion == nil && character == nil && packPath == nil) else {
-            throw SpritePackError("Pause, resume, and quit do not accept character or motion options.")
+            throw SpritePackError("Only show and play accept character or motion options.")
         }
         self.action = action; self.motion = motion; self.character = character; self.packPath = packPath
     }

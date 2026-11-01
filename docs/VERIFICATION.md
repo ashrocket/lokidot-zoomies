@@ -32,3 +32,11 @@ All performers share one click-through panel, one Core Animation clock, and one 
 The validator cannot prove a dog's identity, artistic quality, or gait realism. The agent setup prompt explicitly requires actual dog artwork and visual review, and identifies any unperformed validation or playback check. The simple pack supports runs and circles; prancing requires a complete pet-v2 pack.
 
 Physical multi-display hot-plug, VoiceOver interaction, Intel execution, every supported macOS version, and Instruments frame-time or energy measurements remain unverified. No sustained FPS, memory, or energy-use claim is made. The app is locally signed, not Developer ID signed or notarized.
+# Calendar alarm source build (2026-11-01)
+
+- `./lokidot test`: 61 XCTest cases passed, including 13 calendar scheduler cases; all 8 staged-update verification checks passed.
+- `./lokidot build`: app, ZIP, and current-user Mac PKG built successfully on Apple silicon. The app's strict code-signature verification passed; all four bundled packs validated. The sandboxed attempt compiled but icon packaging failed; the normal host build completed.
+- Live Mac check: `lokidot calendars` opened the calendar window without a permission prompt. Alarms were off, event titles hidden, and the enable control disabled until permission. **Try a pet alarm** displayed the nonactivating test card; **Dismiss** removed it. No calendar event was created.
+- Calendar tests use synthetic events and cover recurrence, moved occurrences, Apple/Google calendar selection, snooze across restart, cancellation/removal, expiry, duplicate prevention, the two-minute catch-up limit, and DST fallback.
+- Live Apple/Google event delivery remains to be checked after the owner connects calendars. No calendar permission was granted during verification, and no personal events were read. Sleep/session UI behavior is implemented but was not exercised by putting the owner's Mac to sleep.
+- No Windows calendar integration or new public installer release is claimed by this change.

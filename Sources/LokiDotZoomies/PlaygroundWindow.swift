@@ -6,6 +6,7 @@ final class PlaygroundWindow: NSWindowController {
     var onPlay: ((String, MotionStyle) -> Void)?
     var onPause: (() -> Void)?
     var onImport: (() -> Void)?
+    var onCalendars: (() -> Void)?
     private let pets = NSPopUpButton(frame: .zero, pullsDown: false)
     private let motions = NSPopUpButton(frame: .zero, pullsDown: false)
     private let status = NSTextField(wrappingLabelWithString: "Ready for a little chaos?")
@@ -18,7 +19,7 @@ final class PlaygroundWindow: NSWindowController {
     private var committedMotion: MotionStyle?
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 610),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 650),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "LokiDot Zoomies"
         window.isReleasedWhenClosed = false
@@ -61,6 +62,8 @@ final class PlaygroundWindow: NSWindowController {
         let hint = NSTextField(wrappingLabelWithString: "When your agent says the pack is ready, choose its finished folder with Add your dog. A photo alone won’t animate. The paw menu stays handy when you close this window.")
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
         root.addArrangedSubview(hint)
+        let calendars = NSButton(title: "Calendar alarms…", target: self, action: #selector(openCalendars))
+        calendars.bezelStyle = .rounded; root.addArrangedSubview(calendars)
         window.contentView!.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor, constant: 28),
@@ -123,6 +126,7 @@ final class PlaygroundWindow: NSWindowController {
     }
     @objc private func togglePause() { onPause?() }
     @objc private func importDog() { onImport?() }
+    @objc private func openCalendars() { onCalendars?() }
     @objc private func copySetupPrompt() {
         guard let url = Bundle.main.url(forResource: "DogSetupPrompt", withExtension: "txt"),
               let prompt = try? String(contentsOf: url, encoding: .utf8) else {
