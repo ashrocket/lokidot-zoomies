@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>LokiDot.Zoomies</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <!-- Deliberate allowlist: never glob private packs or footage. -->
+  <ItemGroup>
+    <Content Include="../../Resources/Characters/whippet/manifest.json;../../Resources/Characters/whippet/atlas.png">
+      <Link>Characters/whippet/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../../Resources/Characters/beagle/manifest.json;../../Resources/Characters/beagle/atlas.png">
+      <Link>Characters/beagle/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../../Resources/Characters/robot-loki/manifest.json;../../Resources/Characters/robot-loki/atlas.png">
+      <Link>Characters/robot-loki/%(Filename)%(Extension)</Link><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>
