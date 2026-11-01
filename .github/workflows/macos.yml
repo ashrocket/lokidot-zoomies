@@ -1,0 +1,23 @@
+name: macOS app and installer
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['Sources/**', 'Tests/**', 'Resources/**', 'scripts/**', '.github/workflows/macos.yml']
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test and build the standard app
+        run: ./lokidot test && ./lokidot build
+      - name: Preserve app and installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LokiDot-Zoomies-macos-${{ runner.arch }}
+          path: |
+            dist/*.pkg
+            dist/*.zip
+          if-no-files-found: error
