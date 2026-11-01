@@ -37,6 +37,15 @@ cp "$NATIVE/SpritePackTool" "$APP/Contents/MacOS/SpritePackTool"
 cp scripts/install.sh "$APP/Contents/Resources/install.sh"
 cp Resources/DogSetupPrompt.txt "$APP/Contents/Resources/DogSetupPrompt.txt"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Generate every standard and Retina icon size from the original artwork.
+ICONSET="$STAGING/AppIcon.iconset"
+mkdir -p "$ICONSET"
+for SIZE in 16 32 128 256 512; do
+  sips -z "$SIZE" "$SIZE" Resources/AppIcon/whippet-head.png --out "$ICONSET/icon_${SIZE}x${SIZE}.png" >/dev/null
+  RETINA=$((SIZE * 2))
+  sips -z "$RETINA" "$RETINA" Resources/AppIcon/whippet-head.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 if [[ -n "$PACK" ]]; then
   "$NATIVE/SpritePackTool" bundle "$PACK" "$APP"
 fi

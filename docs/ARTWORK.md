@@ -13,3 +13,7 @@ Beagle's prior visual review reported clear cardinal gazes, with approximate int
 The Whippet ZIP also contains expansion sheets for turns, circles, prancing, play bows, skids, and settling. Those originals are preserved separately for later motion work; this release does not claim to play the expansion animations.
 
 The synthetic Sample pack produced by scripts/make-sample-pack.sh is original test geometry, generated only on explicit request. It is never silently substituted for a user character. Other imported art retains its own license.
+
+## App icon
+
+`Resources/AppIcon/whippet-head.png` is original AI-generated whippet-head line art made for Zoomies on 31 October 2026 with the built-in image generation tool. The owner requested its publication in this repository under the same MIT license. It has a transparent background and contains no reference-image pixels. The build uses macOS `sips` and `iconutil` to package the standard and Retina sizes into `AppIcon.icns` before signing the app.
