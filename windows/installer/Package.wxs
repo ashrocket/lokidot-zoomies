@@ -1,0 +1,23 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="LokiDot Zoomies Preview" Manufacturer="LokiDot" Version="0.1.0"
+           UpgradeCode="D632D395-894C-4B72-AF27-6DAAF6155D06" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer LokiDot Zoomies preview is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="LokiDot Zoomies Preview" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="LokiDot Zoomies Preview">
+        <Component Id="StartMenu" Guid="697D0A07-7225-4985-841E-EF9FC5AE2CF3">
+          <Shortcut Id="StartShortcut" Name="LokiDot Zoomies Preview" Target="[INSTALLFOLDER]LokiDot.Zoomies.exe" WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\LokiDot\ZoomiesPreview" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main" Title="LokiDot Zoomies Preview">
+      <Files Directory="INSTALLFOLDER" Include="$(PublishDir)\**" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+  </Package>
+</Wix>
