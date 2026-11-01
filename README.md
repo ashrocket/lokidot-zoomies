@@ -10,7 +10,7 @@ Good dogs. Big zoomies. A small native Mac app that lets Loki, a beagle, an illu
 
 ## Let them out
 
-**Just want to play?** Download the Apple Silicon app from [GitHub Releases](https://github.com/ashrocket/lokidot-zoomies/releases/latest), unzip it, move **LokiDot Zoomies.app** into `~/Applications`, and open it. The release app does not need Xcode. It is locally signed and not notarized; macOS may ask you to review the app before opening it.
+**Just want to play?** Download the app from [GitHub Releases](https://github.com/ashrocket/lokidot-zoomies/releases/latest). If the release includes a `.pkg`, quit Zoomies and open the installer: it installs **LokiDot Zoomies.app** in your `~/Applications` folder without an administrator account. The ZIP remains available: unzip it and move the app there yourself. Match the download to your Mac's architecture. The app does not need Xcode. It is locally signed and not notarized; macOS may ask you to review it before opening.
 
 To add the command after installing the downloaded app:
 
@@ -35,9 +35,9 @@ The installer puts **LokiDot Zoomies.app** in `~/Applications` and the command i
 
 Prefer clicking? Open **LokiDot Zoomies** in Finder, Spotlight, or the Dock. The playground has a dog picker, a move picker, **Let’s go!**, **Pause**, and **Add your dog…**. Closing that window leaves the dogs playing; reopen the app or use the paw menu to get the controls back.
 
-Already built it? `./lokidot` launches without rebuilding. `./lokidot build` makes a fresh build, and `./lokidot install --no-build` installs that build. `dist/LokiDot Zoomies.zip` contains the app for distribution. No `cat dist/app-path.txt` incantation needed.
+Already built it? `./lokidot` launches without rebuilding. `./lokidot build` makes a fresh build, a ZIP, and a macOS `.pkg` installer in `dist/`. `./lokidot install --no-build` installs that build and its command. The `.pkg` installs the app; use the command above if you also want the optional terminal launcher. The installer packages the standard bundled dogs; personal packs stay in their own folders for **Add your dog…**.
 
-The app is locally signed, not Developer ID signed or notarized. Respect macOS security prompts; the installer does not disable security settings or remove quarantine attributes. No server, account, third-party packages, login item, or Accessibility permission is required.
+The app is locally signed, not Developer ID signed or notarized; the `.pkg` installer is unsigned. Respect macOS security prompts; the installer does not disable security settings or remove quarantine attributes. No server, account, third-party packages, login item, or Accessibility permission is required.
 
 ## A few good commands
 

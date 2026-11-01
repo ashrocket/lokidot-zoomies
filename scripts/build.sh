@@ -61,4 +61,5 @@ codesign --verify --strict "$APP"
 mkdir -p dist
 ditto -c -k --keepParent "$APP" "$PWD/dist/LokiDot Zoomies.zip"
 printf '%s\n' "$APP" > dist/app-path.txt
+if [[ -z "$PACK" ]]; then ./scripts/package-macos.sh "$APP"; fi
 printf 'Built %s\nOpen: ./lokidot\nInstall app + command: ./lokidot install --no-build\nTry the whole pack: ./lokidot all\n' "$APP"
