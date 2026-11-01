@@ -13,6 +13,8 @@ Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets 
 
 **Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
 
+[Watch Loki Vampire’s Halloween zoomies with an original spooky score](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/Halloween-Zoomies-spooky.mp4).
+
 ![Loki, Beagle, and Whippet taking little circles together](docs/previews/all-dogs-circle.gif)
 
 [Watch the happy-prance preview](docs/previews/all-dogs-prance.gif).
