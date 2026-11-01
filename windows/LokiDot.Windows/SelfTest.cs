@@ -20,8 +20,8 @@ internal static class SelfTest
                 try { action(); } catch (Exception e) when (e is InvalidDataException or JsonException or IOException or ArgumentException or OverflowException or NotSupportedException) { results.Add("PASS reject " + name); return; }
                 throw new InvalidDataException("Accepted invalid fixture: " + name);
             }
-            var packs = new[] { "whippet", "beagle", "robot-loki" }.Select(id => SpritePack.Load(Path.Combine(AppContext.BaseDirectory,"Characters",id))).ToArray();
-            Check(packs.Length == 3 && packs.All(p => p.Frames.Count >= 3), "bundled public packs decoded and every declared frame inspected");
+            var packs = new[] { "whippet", "beagle", "robot-loki", "loki-vampire" }.Select(id => SpritePack.Load(Path.Combine(AppContext.BaseDirectory,"Characters",id))).ToArray();
+            Check(packs.Length == 4 && packs.All(p => p.Frames.Count >= 3), "bundled public packs decoded and every declared frame inspected");
             string json = """
                 {"schemaVersion":1,"format":"zoomies-v1","id":"test","name":"Test","image":"atlas.png","frameWidth":8,"frameHeight":8,"animations":{"idle":{"row":0,"column":0,"frameCount":1,"fps":8},"running-right":{"row":1,"column":0,"frameCount":2,"fps":8},"running-left":{"row":2,"column":0,"frameCount":2,"fps":8}}}
                 """;
@@ -33,7 +33,9 @@ internal static class SelfTest
             Reject(() => ControlsWindow.ValidateRoutine([packs[0], simplePack], MotionStyle.Prance), "All dogs Prance includes a pack without jumping artwork");
             ControlsWindow.ValidateRoutine([simplePack], MotionStyle.Zoomies);
             ControlsWindow.ValidateRoutine([simplePack], MotionStyle.Circle);
-            ControlsWindow.ValidateRoutine(packs, MotionStyle.Prance);
+            ControlsWindow.ValidateRoutine(packs.Where(pack => pack.Frames.ContainsKey("jumping")), MotionStyle.Prance);
+            Reject(() => ControlsWindow.ValidateRoutine(packs, MotionStyle.Prance), "All dogs Prance with Loki Vampire");
+            Check(packs.Single(pack => pack.Manifest.Id == "loki-vampire").Frames.Count == 3, "Loki Vampire is bundled as a simple pack");
             results.Add("PASS simple-pack running routines and full-pack Prance remain available");
             Reject(() => Decode(json.Replace("\"name\":\"Test\"", "\"name\":\"Test\",\"command\":\"run\"")), "executable / unknown root field");
             Reject(() => Decode(json.Replace("\"fps\":8", "\"fps\":8,\"script\":\"run\"")), "unknown animation field");
@@ -75,7 +77,8 @@ internal static class SelfTest
             }
             double previous=0; for(int i=0;i<=1000;i++) { double value=Motion.Distance(i/1000d); SpritePack.Require(value>=previous-1e-12,"Distance reversed."); previous=value; }
             results.Add("PASS bounded finite motion, monotonic distance and routine closure");
-            var controls=new ControlsWindow(); controls.Show(); controls.UpdateLayout();
+            UpdateTests.Run(Check);
+            var controls=new ControlsWindow(enableUpdates: false); controls.Show(); controls.UpdateLayout();
             Save(controls,Path.Combine(evidence,"controls.png")); controls.Close();
             var pet=new PetWindow(packs[0],new Rect(0,0,1920,1080),0,1); pet.Show(); pet.Draw(MotionStyle.Prance,.4,false,2); pet.UpdateLayout();
             var image=Save(pet,Path.Combine(evidence,"sprite-render.png")); byte[] pixels=new byte[image.PixelWidth*image.PixelHeight*4]; image.CopyPixels(pixels,image.PixelWidth*4,0);

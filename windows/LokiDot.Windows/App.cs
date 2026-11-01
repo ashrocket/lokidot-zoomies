@@ -34,17 +34,26 @@ public sealed class ControlsWindow : Window
     bool paused;
     bool finished;
     MotionStyle activeStyle;
-    public ControlsWindow()
+    readonly UpdateController updates;
+    public ControlsWindow(bool enableUpdates = true)
     {
-        Title = "LokiDot Zoomies — Windows preview"; Width = 390; Height = 540; ResizeMode = ResizeMode.CanMinimize;
-        var panel = new StackPanel { Margin = new(24) }; Content = panel;
+        Title = "LokiDot Zoomies — Windows preview"; Width = 410; Height = 700; ResizeMode = ResizeMode.CanMinimize;
+        var panel = new StackPanel { Margin = new(24) }; Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         panel.Children.Add(new TextBlock { Text = "Your desktop, with dogs", FontSize = 23, FontWeight = FontWeights.SemiBold });
         panel.Children.Add(new Label { Content = "Dog", Target = dogs }); panel.Children.Add(dogs);
         panel.Children.Add(new Label { Content = "Routine", Target = styles }); panel.Children.Add(styles); panel.Children.Add(repeat);
         var start = new Button { Content = "Start", Margin = new(0, 4, 0, 4) }; panel.Children.Add(start); panel.Children.Add(pause);
         var add = new Button { Content = "Add your dog…", Margin = new(0, 4, 0, 4) }; panel.Children.Add(add); panel.Children.Add(status);
-        foreach (string id in new[] { "whippet", "beagle", "robot-loki" }) packs.Add(SpritePack.Load(Path.Combine(AppContext.BaseDirectory, "Characters", id)));
+        foreach (string id in new[] { "whippet", "beagle", "robot-loki", "loki-vampire" }) packs.Add(SpritePack.Load(Path.Combine(AppContext.BaseDirectory, "Characters", id)));
         RefreshDogs();
+        var checkUpdates = new Button { Content = "Check for Updates", Margin = new(0,20,0,8) };
+        var automaticUpdates = new CheckBox {
+            Content = "Automatically check for updates", Margin = new(0,0,0,8),
+            ToolTip = "Checks GitHub after launch and daily. Downloads and installation always need your approval."
+        };
+        var updateStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        panel.Children.Add(checkUpdates); panel.Children.Add(automaticUpdates); panel.Children.Add(updateStatus);
+        updates = new(this, checkUpdates, automaticUpdates, updateStatus, enableUpdates);
         start.Click += (_, _) => Start(); pause.Click += (_, _) => {
             if (finished || pets.Count == 0) return;
             paused = !paused; if (paused) clock.Stop(); else clock.Start(); pause.Content = paused ? "Resume" : "Pause"; status.Text = paused ? "Paused." : "Running.";
@@ -58,7 +67,7 @@ public sealed class ControlsWindow : Window
             } catch (Exception e) { MessageBox.Show(this, e.Message, "Could not add your dog", MessageBoxButton.OK, MessageBoxImage.Warning); }
         };
         timer.Tick += (_, _) => Tick(); timer.Start();
-        Closed += (_, _) => { timer.Stop(); clock.Stop(); foreach (var pet in pets) pet.Close(); };
+        Closed += (_, _) => { updates.Dispose(); timer.Stop(); clock.Stop(); foreach (var pet in pets) pet.Close(); };
         status.Text = "Choose a dog and press Start. Close this window to quit.";
     }
     void RefreshDogs() { dogs.Items.Clear(); dogs.Items.Add("All dogs"); foreach (var p in packs) dogs.Items.Add(p); dogs.SelectedIndex = 0; }

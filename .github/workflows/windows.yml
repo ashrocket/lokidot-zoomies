@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ['windows/**', 'Resources/Characters/**', '.github/workflows/windows.yml']
   push:
-    branches: [main, codex/windows-desktop]
+    branches: [main, codex/windows-desktop, codex/vampire-and-updates]
     paths: ['windows/**', 'Resources/Characters/**', '.github/workflows/windows.yml']
 permissions:
   contents: read

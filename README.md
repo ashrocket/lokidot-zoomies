@@ -1,17 +1,17 @@
 # LokiDot Zoomies 🐾
 
-**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-1.3.1-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-win-x64.msi)**
+**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi)**
 
 | Installer | Requirements | Version |
 | --- | --- | --- |
-| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-1.3.1-macos-arm64.pkg) | Apple silicon, macOS 13+ | 1.3.1 |
-| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.1/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 0.1.0 preview |
+| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg) | Apple silicon, macOS 13+ | 1.3.2 |
+| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 1.3.2 preview |
 
-[Release notes, portable ZIPs, and SHA-256 checksums](https://github.com/ashrocket/lokidot-zoomies/releases/tag/v1.3.1). Both installers are unsigned; the Mac app is locally signed but not notarized. Review your operating system's security prompts. The Windows preview passed automated installer and app checks; interactive desktop testing is still pending. [Windows details](windows/README.md).
+[Release notes, portable ZIPs, and SHA-256 checksums](https://github.com/ashrocket/lokidot-zoomies/releases/latest). Both installers are unsigned; the Mac app is locally signed but not notarized. Review your operating system's security prompts. The Windows preview passed automated installer and app checks; interactive desktop testing is still pending. [Windows details](windows/README.md).
 
 Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
 
-**Mac version 1.3.1:** a normal app window, a friendly `lokidot` command, little circles, happy prancing, a whippet icon, and a PKG installer. Pick one dog or let the whole pack loose. Add custom artwork through **Add your dog…**; the downloads contain the standard dogs.
+**Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
 
 ![Loki, Beagle, and Whippet taking little circles together](docs/previews/all-dogs-circle.gif)
 
@@ -21,7 +21,7 @@ Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets 
 
 **Just want to play on a Mac?** Use the **Mac PKG** link above. Quit Zoomies and open the installer: it installs **LokiDot Zoomies.app** in your `~/Applications` folder without an administrator account. The ZIP remains available: unzip it and move the app there yourself. The downloads target Apple silicon; Intel Mac owners can build from source below. The downloaded app does not need Xcode.
 
-**On Windows?** Open the **Windows MSI** above and launch **LokiDot Zoomies** from the Start Menu. It installs for your current user and includes its .NET runtime. See the [Windows preview guide](windows/README.md) for portable use, building, and current limitations.
+**On Windows?** Open the **Windows MSI** above and launch **LokiDot Zoomies** from the Start Menu. It installs for all users under Program Files, requests administrator approval, and includes its .NET runtime. The portable ZIP runs without installation. See the [Windows preview guide](windows/README.md) for building and current limitations.
 
 To add the command after installing the downloaded app:
 
@@ -48,14 +48,21 @@ Prefer clicking? Open **LokiDot Zoomies** in Finder, Spotlight, or the Dock. The
 
 Already built it? `./lokidot` launches without rebuilding. `./lokidot build` makes a fresh build, a ZIP, and a macOS `.pkg` installer in `dist/`. `./lokidot install --no-build` installs that build and its command. The `.pkg` installs the app; use the command above if you also want the optional terminal launcher. The installer packages the standard bundled dogs; personal packs stay in their own folders for **Add your dog…**.
 
-The app is locally signed, not Developer ID signed or notarized; the `.pkg` installer is unsigned. Respect macOS security prompts; the installer does not disable security settings or remove quarantine attributes. No server, account, third-party packages, login item, or Accessibility permission is required.
+The app is locally signed, not Developer ID signed or notarized; the `.pkg` installer is unsigned. Respect macOS security prompts; the installer does not disable security settings or remove quarantine attributes. Animation runs locally and needs no account, login item, or Accessibility permission.
+
+## Updates
+
+Zoomies checks this repository's latest stable GitHub release in the background. Mac checks run at most once a day; Windows checks shortly after launch and daily while open. **Check for Updates…** checks immediately; the automatic-check setting can be turned off. The app asks before downloading a newer installer, checks its size and SHA-256 against GitHub's release metadata, then hands it to the normal operating-system installer. Finish the installer and reopen Zoomies. Your custom dog folders are preserved.
+
+The Mac controls are in the application and paw menus; the Windows controls are in the app window. Windows installation still needs administrator approval. Details and verification limits: [Mac updates](docs/macos-updates.md) and [Windows updates](docs/windows.md). Update checks use GitHub without an account and never bypass operating-system security prompts.
 
 ## A few good commands
 
 ```sh
 lokidot all                 # The whole pack, one app
-lokidot all circle          # Three dogs, little loops
-lokidot all prance          # A small synchronized celebration
+lokidot all circle          # Four dogs, little loops
+lokidot prance beagle       # Beagle's authored jumping poses
+lokidot zoomies loki-vampire # Loki Vampire takes a lap
 lokidot zoomies beagle      # Beagle gets the stage
 lokidot circle whippet      # Whippet takes a turn
 lokidot pause
@@ -96,7 +103,7 @@ Read the [step-by-step dog guide and copy the complete agent prompt](docs/your-d
 
 Prefer to make the art yourself? Start with `lokidot new-dog FOLDER NAME`, replace the practice sprite, and run `lokidot validate FOLDER`. Then `lokidot dog FOLDER circle` lets them out. See the [exact format and validator rules](docs/sprite-packs.md).
 
-The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. All three bundled dogs already have them.
+The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. Loki, Beagle, and Whippet have them; Loki Vampire currently runs and circles. Choose an individual pet-v2 dog to prance, since the whole pack now includes the vampire.
 
 ## Make it yours, or make it better
 
@@ -121,5 +128,6 @@ The [architecture guide](docs/ARCHITECTURE.md) explains the motion model, render
 | Loki | [Atlas](Resources/Characters/robot-loki/atlas.png) · [manifest](Resources/Characters/robot-loki/manifest.json) | [GIF](docs/previews/robot-loki-running.gif) |
 | Beagle | [Atlas](Resources/Characters/beagle/atlas.png) · [manifest](Resources/Characters/beagle/manifest.json) | [GIF](docs/previews/beagle-running.gif) |
 | Whippet | [Atlas](Resources/Characters/whippet/atlas.png) · [manifest](Resources/Characters/whippet/manifest.json) | [GIF](docs/previews/whippet-running.gif) |
+| Loki Vampire | [Atlas](Resources/Characters/loki-vampire/atlas.png) · [manifest](Resources/Characters/loki-vampire/manifest.json) | Select Loki Vampire in the app |
 
 Original code, synthetic fixtures, and bundled artwork for this release are [MIT licensed](LICENSE). Imported artwork retains its own license. See [artwork provenance](docs/ARTWORK.md). LokiDot is an independent desktop toy, not an official OpenAI app, and does not change your existing Dot avatar.

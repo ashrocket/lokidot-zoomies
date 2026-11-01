@@ -18,9 +18,9 @@ if (@($tree | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePo
     throw 'Characters payload contains a link or reparse point'
 }
 $directories = @($tree | Where-Object { $_.PSIsContainer -and $_.FullName -ne $characters } | ForEach-Object { [IO.Path]::GetRelativePath($characters, $_.FullName).Replace('\', '/') } | Sort-Object)
-if (($directories -join ',') -ne 'beagle,robot-loki,whippet') { throw "Unexpected Characters directories: $directories" }
+if (($directories -join ',') -ne 'beagle,loki-vampire,robot-loki,whippet') { throw "Unexpected Characters directories: $directories" }
 $files = @($tree | Where-Object { !$_.PSIsContainer } | ForEach-Object { [IO.Path]::GetRelativePath($characters, $_.FullName).Replace('\', '/') } | Sort-Object)
-$expected = @('beagle/atlas.png', 'beagle/manifest.json', 'robot-loki/atlas.png', 'robot-loki/manifest.json', 'whippet/atlas.png', 'whippet/manifest.json')
+$expected = @('beagle/atlas.png', 'beagle/manifest.json', 'loki-vampire/atlas.png', 'loki-vampire/manifest.json', 'robot-loki/atlas.png', 'robot-loki/manifest.json', 'whippet/atlas.png', 'whippet/manifest.json')
 if (($files -join ',') -ne ($expected -join ',')) { throw "Unexpected Characters files: $files" }
 
 $zipName = 'LokiDot-Zoomies-win-x64.zip'
@@ -36,7 +36,9 @@ $version = & "$tools/wix.exe" --version
 if ($LASTEXITCODE -ne 0 -or $version -notmatch '^5\.0\.2(?:[.+-]|$)') { throw "Expected pinned WiX 5.0.2; found $version" }
 & "$tools/wix.exe" build "$PSScriptRoot/installer/Package.wxs" -arch x64 -d "PublishDir=$publish" -o "$run/$msiName"
 if ($LASTEXITCODE -ne 0) { throw 'WiX build failed' }
-Get-FileHash "$run/$zipName", "$run/$msiName" | Format-Table | Out-String | Set-Content "$run/SHA256.txt"
+Get-FileHash "$run/$zipName", "$run/$msiName" | ForEach-Object {
+    "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))"
+} | Set-Content -Encoding ascii "$run/SHA256.txt"
 # Stable current-run entry points; the complete original output remains under runs/<id>.
 Copy-Item -LiteralPath "$run/$zipName", "$run/$msiName", "$run/SHA256.txt" -Destination $Output -Force
 Set-Content -LiteralPath "$Output/publish-path.txt" -Value $publish -NoNewline

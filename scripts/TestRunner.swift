@@ -8,6 +8,7 @@ enum TestRunner {
         suite.addTest(MotionRoutineTests.defaultTestSuite)
         suite.addTest(LaunchRequestTests.defaultTestSuite)
         suite.addTest(SpritePackTests.defaultTestSuite)
+        suite.addTest(UpdateReleaseTests.defaultTestSuite)
         suite.run()
         guard let result = suite.testRun, result.executionCount > 0 else { exit(2) }
         exit(result.hasSucceeded ? 0 : 1)
