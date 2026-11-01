@@ -14,8 +14,12 @@ final class MotionRoutineTests: XCTestCase {
                     let size = routine.route.spriteSize
                     for step in 0...1800 {
                         let pose = routine.sample(progress: Double(step) / 1800)
-                        let halfW = (abs(cos(pose.bank)) * size.width * pose.scaleX + abs(sin(pose.bank)) * size.height * pose.scaleY) / 2
-                        let halfH = (abs(sin(pose.bank)) * size.width * pose.scaleX + abs(cos(pose.bank)) * size.height * pose.scaleY) / 2
+                        let cosine = CGFloat(abs(cos(pose.bank)))
+                        let sine = CGFloat(abs(sin(pose.bank)))
+                        let scaledWidth = size.width * CGFloat(pose.scaleX)
+                        let scaledHeight = size.height * CGFloat(pose.scaleY)
+                        let halfW = (cosine * scaledWidth + sine * scaledHeight) / 2
+                        let halfH = (sine * scaledWidth + cosine * scaledHeight) / 2
                         XCTAssertGreaterThanOrEqual(pose.point.x - halfW, bounds.minX)
                         XCTAssertLessThanOrEqual(pose.point.x + halfW, bounds.maxX)
                         XCTAssertGreaterThanOrEqual(pose.point.y - halfH, bounds.minY)
