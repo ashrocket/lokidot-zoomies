@@ -28,14 +28,36 @@ try {
     Msi -MsiArgs @('/i', "`"$msi`"", '/qn', '/norestart', '/l*v', "`"$evidence/install.log`"")
     if (!(Test-Path $exe) -or !(Test-Path $shortcut)) { throw 'Installed app or Start Menu shortcut missing' }
     SelfTest $exe "$evidence/installed"
-    # Normal entry point must remain alive and create its controls window.
-    $startup = Start-Process $exe -PassThru
+    # WaitForInputIdle can return when any thread becomes idle, before WPF has
+    # decoded the bundled atlases and shown the controller. Observe the actual
+    # window instead, with a deadline and a receipt for every failure/success.
+    $startup = Start-Process $exe -WorkingDirectory $installed -PassThru
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $trace = Join-Path $evidence 'startup.txt'
+    "Normal entry point PID=$($startup.Id); expected title=LokiDot Zoomies — Windows preview" | Set-Content $trace
     try {
-        if (!$startup.WaitForInputIdle(15000)) { throw 'App did not become input-idle' }
-        $startup.Refresh()
-        if ($startup.HasExited -or $startup.MainWindowHandle -eq 0) { throw 'App startup did not create a controls window' }
+        $ready = $false
+        while ($watch.Elapsed.TotalSeconds -lt 30) {
+            $startup.Refresh()
+            if ($startup.HasExited) {
+                "Exited after $($watch.ElapsedMilliseconds) ms; code=$($startup.ExitCode)" | Add-Content $trace
+                throw "App exited before its controls window was ready; see $trace"
+            }
+            $handle = $startup.MainWindowHandle
+            $title = $startup.MainWindowTitle
+            $responding = $handle -ne 0 -and $startup.Responding
+            "elapsedMs=$($watch.ElapsedMilliseconds) handle=$handle responding=$responding title=$title" | Add-Content $trace
+            if ($handle -ne 0 -and $title -eq 'LokiDot Zoomies — Windows preview' -and $responding) {
+                $ready = $true
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        }
+        if (!$ready) { throw "App did not create a responsive controls window within 30 seconds; see $trace" }
+        "PASS actual controls window ready after $($watch.ElapsedMilliseconds) ms" | Add-Content $trace
         if (!$startup.CloseMainWindow()) { throw 'Could not close app normally' }
         if (!$startup.WaitForExit(15000) -or $startup.ExitCode -ne 0) { throw 'App did not exit normally' }
+        'PASS normal close exited with code 0' | Add-Content $trace
     } finally { if (!$startup.HasExited) { $startup.Kill(); $startup.WaitForExit() } }
     'PASS clean MSI install, Start Menu shortcut, installed self-test, normal startup and close' | Set-Content "$evidence/lifecycle.txt"
 } finally {
