@@ -13,6 +13,8 @@ Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets 
 
 **Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
 
+**Source build 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory. At idle it has an 11 MB footprint (1.3.2: 67 MB) and no overlay window. The whippet appears only when a reminder fires or when you ask for zoomies. The published installers are still 1.3.2. See [Meeting reminders](docs/calendar-alarms.md).
+
 [Watch Loki Vampire’s Halloween zoomies with an original spooky score](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/Halloween-Zoomies-spooky.mp4).
 
 ![Loki, Beagle, and Whippet taking little circles together](docs/previews/all-dogs-circle.gif)
@@ -80,20 +82,22 @@ lokidot quit                # Everyone goes for a nap
 | **Little circles** | Two compact loops, a touch of depth, and soft transitions between the authored left and right poses. Dogs stay upright and visible. |
 | **Happy prance** | Six small hops, using each dog's actual jumping frames, with soft landings and a short stagger across the pack. |
 
-The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**, and **Repeat gently**. A move plays once, then rests for 24 seconds before repeating. Turn off **Repeat gently** for one take. macOS **Reduce Motion** keeps the pets still. Sleep and inactive login sessions hide and pause the overlay.
+The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**, and **Repeat gently**. In 2.0.0, a move plays once and the dog leaves the screen. Turn on **Repeat gently** to keep the dog on the desktop and repeat the move every 24 seconds. The repeat uses more memory and power. macOS **Reduce Motion** keeps the pets still. Sleep and inactive login sessions hide and pause the overlay.
 
 The desktop overlay is transparent and click-through. Your normal work stays clickable.
 
-## Let your pet remind you
+## Let the whippet remind you about meetings
 
-The Mac source build now has **Calendar alarms…** in the playground and paw menu. Connect Apple Calendar, select your calendars, and let your pet nudge you before an event. Google Calendar works through the Google account synced to Apple Calendar on your Mac. Choose an advance reminder, optional sound, and whether event titles appear; alerts have **Snooze 5 min** and **Dismiss**.
+Open **Meeting reminders…** in the paw menu. Connect Apple Calendar, or paste a Google or Outlook calendar link (ICS). Before each meeting, the whippet runs across the screen and a card shows the meeting with **Join**. A second card shows at the start time. The menu bar counts down to your next meeting, and the paw menu lists the next meetings with **Join**.
+
+Use the Outlook link for Microsoft 365 work calendars. Microsoft started to turn off EWS in Exchange Online on October 1, 2026, so Apple Calendar can stop syncing those accounts.
 
 ```sh
-lokidot calendars    # Connect and choose calendars
-lokidot alarm-test   # Try an alert without calendar access
+lokidot calendars    # Open meeting reminders
+lokidot alarm-test   # Try a reminder card without calendar access
 ```
 
-Keep Zoomies running and the Mac awake. This feature is not in the published 1.3.2 installers or Windows preview yet. [Calendar setup, Google sync, privacy, and alarm behavior](docs/calendar-alarms.md).
+Turn on **Open LokiDot at login** so that reminders continue after a restart. The feature is in the Mac source build 2.0.0, not in the published 1.3.2 installers or the Windows preview. [Setup, sources, privacy and behavior](docs/calendar-alarms.md).
 
 ## Bring your own best friend
 

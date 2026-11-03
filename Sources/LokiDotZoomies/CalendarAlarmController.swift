@@ -68,6 +68,8 @@ final class CalendarAlarmController: NSObject {
     private var alertWindow: PetAlarmWindow?
     var onPetAlert: (() -> Void)?
     var onUpcomingChanged: (() -> Void)?
+    /// Verification only: sources from launch flags are never saved.
+    private var debugMode = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -415,8 +417,51 @@ final class CalendarAlarmController: NSObject {
         if on && SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
     }
 
+    /// `--feed-file PATH` and `--feed-url URL` add an in-memory source for
+    /// testing. Nothing about them is written to preferences.
+    func enableDebugSources(feedFile: String?, feedURL: String?) {
+        guard feedFile != nil || feedURL != nil else { return }
+        debugMode = true
+        settings.enabled = true
+        if let feedFile {
+            let calendarID = "feed:debug-file"
+            settings.calendarIDs.insert(calendarID)
+            let now = Date()
+            do {
+                let text = try String(contentsOfFile: feedFile, encoding: .utf8)
+                let parsed = try ICSFeed.events(from: text, window: DateInterval(start: now.addingTimeInterval(-CalendarAlarmScheduler.lateStartInterval),
+                                                                                 end: now.addingTimeInterval(Self.lookAhead)))
+                feedEvents["debug-file"] = CalendarAlarmEvent.fromFeed(parsed, calendarID: calendarID)
+                feedStatus["debug-file"] = "Loaded \(parsed.count) from file"
+            } catch { feedStatus["debug-file"] = "File error: \(error.localizedDescription)" }
+        }
+        if let feedURL, let url = CalendarFeedConfig.normalizedURL(feedURL) {
+            let feed = CalendarFeedConfig(id: "debug-url", name: "Debug link", url: url.absoluteString)
+            settings.feeds.append(feed); settings.calendarIDs.insert(feed.calendarID)
+            fetch(feed)
+        }
+        recompute()
+    }
+
+    var diagnostics: [String: Any] {
+        [
+            "remindersEnabled": settings.enabled,
+            "eventCount": events.count,
+            "upcoming": upcoming.prefix(5).map { ["start": ISO8601DateFormatter().string(from: $0.start),
+                                                  "hasJoinLink": $0.joinURL != nil] },
+            "nextReminder": scheduler.nextFireDate(events: events, settings: settings, now: Date())
+                .map { ISO8601DateFormatter().string(from: $0) } ?? "none",
+            "cardVisible": alertWindow?.window?.isVisible ?? false,
+            "cardHasJoin": active?.joinURL != nil,
+            "queued": queue.count,
+            "timerArmed": fireTimer?.isValid ?? false,
+            "feedStatus": feedStatus,
+            "eventKitOpened": store != nil
+        ]
+    }
+
     private func persist() {
-        if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: "calendarAlarms.settings") }
+        if !debugMode, let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: "calendarAlarms.settings") }
         if let data = try? JSONEncoder().encode(scheduler.receipts) { defaults.set(data, forKey: "calendarAlarms.receipts") }
     }
 

@@ -130,12 +130,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         }
         calendarAlarms.onUpcomingChanged = { [weak self] in self?.refreshCountdown() }
         calendarAlarms.start()
+        let args = CommandLine.arguments
+        func value(_ flag: String) -> String? { args.firstIndex(of: flag).flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil } }
+        calendarAlarms.enableDebugSources(feedFile: value("--feed-file"), feedURL: value("--feed-url"))
         refreshCountdown()
 
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
-            Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
-                Task { @MainActor in self?.writeDiagnostics(to: url) }
+            for delay in [2.0, 20.0] {
+                Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+                    Task { @MainActor in self?.writeDiagnostics(to: url) }
+                }
             }
         }
     }
@@ -882,7 +887,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             "visibleFrame": NSStringFromRect(overlay?.window.frame ?? .zero),
             "petPosition": NSStringFromPoint(position),
             "hasLapAnimation": overlay?.pet.animation(forKey: "zoomies") != nil,
-            "activeRestTimer": restTimer?.isValid ?? false
+            "activeRestTimer": restTimer?.isValid ?? false,
+            "menuBarTitle": statusItem.button?.title ?? "",
+            "calendar": calendarAlarms.diagnostics
         ]
         do {
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])

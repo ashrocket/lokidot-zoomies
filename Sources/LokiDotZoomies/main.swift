@@ -9,9 +9,9 @@ if args.contains("--all-ready") && args.contains("--pack") {
 if args.contains("--spritesheet") {
     fail("--spritesheet has been replaced by --pack /path/to/folder. Add manifest.json; see docs/sprite-packs.md.")
 }
-for flag in ["--pack", "--render-preview", "--render-motion-preview", "--diagnostics", "--motion"] {
+for flag in ["--pack", "--render-preview", "--render-motion-preview", "--diagnostics", "--motion", "--feed-file", "--feed-url"] {
     if let index = args.firstIndex(of: flag), args.count <= index + 1 || args[index + 1].hasPrefix("--") {
-        fail("\(flag) requires a local path.")
+        fail("\(flag) requires a value.")
     }
 }
 if let index = args.firstIndex(of: "--motion"), MotionStyle(rawValue: args[index + 1]) == nil {
