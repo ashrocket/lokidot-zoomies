@@ -220,4 +220,62 @@ final class ICSFeedTests: XCTestCase {
         let text = calendarText(vevent("UID:a", "DTSTART:20261103T150000Z", "RRULE:FREQ=HOURLY"))
         XCTAssertEqual(try parse(text).map(\.start), [utcDate(2026, 11, 3, 15)])
     }
+
+    func testHostileDurationAndNumbersDoNotTrap() throws {
+        let huge = calendarText(vevent("UID:a", "DTSTART:20261103T150000Z", "DURATION:P2000000000000000000W"))
+        XCTAssertEqual(try parse(huge).count, 1)
+        let clamped = calendarText(vevent("UID:a", "DTSTART:20261103T150000Z", "DURATION:P1000D"))
+        XCTAssertEqual(try parse(clamped).first?.end, utcDate(2026, 11, 3, 15).addingTimeInterval(400 * 86_400))
+        let interval = calendarText(vevent("UID:a", "DTSTART:20261103T150000Z",
+                                           "RRULE:FREQ=DAILY;INTERVAL=999999999999999999"))
+        XCTAssertEqual(try parse(interval).count, 1)
+        let count = calendarText(vevent("UID:a", "DTSTART:20261103T150000Z", "RRULE:FREQ=DAILY;COUNT=99999999999"))
+        XCTAssertGreaterThanOrEqual(try parse(count).count, 1)
+    }
+
+    func testDailySeriesStartedLongAgoStillProducesToday() throws {
+        let text = calendarText(vevent("UID:old", "DTSTART:20060101T150000Z", "RRULE:FREQ=DAILY"))
+        let window = DateInterval(start: utcDate(2026, 11, 3), end: utcDate(2026, 11, 4))
+        XCTAssertEqual(try parse(text, window: window).map(\.start), [utcDate(2026, 11, 3, 15)])
+    }
+
+    func testCountOneReturnsOnlyDTSTART() throws {
+        let daily = calendarText(vevent("UID:a", "DTSTART:20261102T150000Z", "RRULE:FREQ=DAILY;COUNT=1"))
+        XCTAssertEqual(try parse(daily).map(\.start), [utcDate(2026, 11, 2, 15)])
+        let weekly = calendarText(vevent("UID:b", "DTSTART:20261102T150000Z",
+                                         "RRULE:FREQ=WEEKLY;COUNT=1;BYDAY=MO,TU"))
+        XCTAssertEqual(try parse(weekly).map(\.start), [utcDate(2026, 11, 2, 15)])
+    }
+
+    func testCountIncludesDTSTARTInWeeklyByDay() throws {
+        let text = calendarText(vevent("UID:a", "DTSTART:20261102T150000Z",
+                                       "RRULE:FREQ=WEEKLY;COUNT=3;BYDAY=MO,WE"))
+        XCTAssertEqual(try parse(text).map(\.start), [
+            utcDate(2026, 11, 2, 15), utcDate(2026, 11, 4, 15), utcDate(2026, 11, 9, 15),
+        ])
+    }
+
+    func testSpringForwardGapShiftsForward() throws {
+        let text = calendarText(vevent("UID:a", "DTSTART;TZID=America/New_York:20260301T023000",
+                                       "RRULE:FREQ=DAILY"))
+        let window = DateInterval(start: utcDate(2026, 3, 8), end: utcDate(2026, 3, 9))
+        XCTAssertEqual(try parse(text, window: window).map(\.start), [utcDate(2026, 3, 8, 7, 30)])
+    }
+
+    func testTimingWithManyMasters() throws {
+        var blocks: [[String]] = []
+        for index in 0..<300 {
+            blocks.append(vevent("UID:w\(index)", "DTSTART:20161107T150000Z",
+                                 "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"))
+            blocks.append(vevent("UID:d\(index)", "DTSTART:20160101T150000Z", "RRULE:FREQ=DAILY"))
+        }
+        let text = calendarText(blocks.flatMap { $0 })
+        let window = DateInterval(start: utcDate(2026, 11, 1, 12), end: utcDate(2026, 11, 4, 12))
+        let started = Date()
+        let events = try parse(text, window: window)
+        let elapsed = Date().timeIntervalSince(started)
+        // Daily masters hit Nov 1, 2, 3. Weekly masters hit Mon Nov 2 and Tue Nov 3.
+        XCTAssertEqual(events.count, 300 * 3 + 300 * 2)
+        XCTAssertLessThan(elapsed, 2.0)
+    }
 }
