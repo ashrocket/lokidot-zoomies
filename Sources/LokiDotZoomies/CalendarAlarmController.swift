@@ -73,8 +73,12 @@ final class CalendarAlarmController: NSObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        settings = defaults.data(forKey: "calendarAlarms.settings")
+        var saved = defaults.data(forKey: "calendarAlarms.settings")
             .flatMap { try? JSONDecoder().decode(CalendarAlarmSettings.self, from: $0) } ?? .init()
+        // Earlier builds saved their private defaults before reminders were ever
+        // set up. If nothing was configured, start from the 2.0 defaults.
+        if !saved.enabled && saved.calendarIDs.isEmpty && saved.feeds.isEmpty { saved = .init() }
+        settings = saved
         let receipts = defaults.data(forKey: "calendarAlarms.receipts")
             .flatMap { try? JSONDecoder().decode([CalendarAlarmReceipt].self, from: $0) } ?? []
         scheduler = CalendarAlarmScheduler(receipts: receipts)

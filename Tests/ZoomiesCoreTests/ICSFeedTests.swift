@@ -276,6 +276,8 @@ final class ICSFeedTests: XCTestCase {
         let elapsed = Date().timeIntervalSince(started)
         // Daily masters hit Nov 1, 2, 3. Weekly masters hit Mon Nov 2 and Tue Nov 3.
         XCTAssertEqual(events.count, 300 * 3 + 300 * 2)
-        XCTAssertLessThan(elapsed, 2.0)
+        // About 0.1 s here; the old per-day walk took 26–37 s. The generous
+        // bound still catches that regression on slow shared CI runners.
+        XCTAssertLessThan(elapsed, 10.0)
     }
 }

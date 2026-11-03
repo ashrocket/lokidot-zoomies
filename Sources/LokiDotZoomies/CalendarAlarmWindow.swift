@@ -31,7 +31,7 @@ final class CalendarAlarmWindow: NSWindowController {
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Meeting reminders"; window.isReleasedWhenClosed = false
         super.init(window: window)
-        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12
+        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 10
         root.translatesAutoresizingMaskIntoConstraints = false
         let heading = NSTextField(labelWithString: "Your whippet watches the clock.")
         heading.font = .systemFont(ofSize: 22, weight: .bold)
@@ -76,23 +76,34 @@ final class CalendarAlarmWindow: NSWindowController {
         root.addArrangedSubview(atStart); root.addArrangedSubview(sound); root.addArrangedSubview(titles); root.addArrangedSubview(login)
         let test = NSButton(title: "Try a reminder", target: self, action: #selector(testAlarm)); test.bezelStyle = .rounded
         root.addArrangedSubview(test)
-        root.addArrangedSubview(label("The whippet runs across your screen and a card shows the meeting with Join, Remind me at start, and Dismiss. All-day, cancelled and declined events are skipped. Keep Zoomies open; it uses no CPU between reminders."))
+        root.addArrangedSubview(label("All-day, cancelled and declined events are skipped. Keep Zoomies open; it uses no CPU between reminders."))
         window.contentView!.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor, constant: 24),
             root.trailingAnchor.constraint(equalTo: window.contentView!.trailingAnchor, constant: -24),
             root.topAnchor.constraint(equalTo: window.contentView!.topAnchor, constant: 20),
             root.bottomAnchor.constraint(lessThanOrEqualTo: window.contentView!.bottomAnchor, constant: -20),
-            scroll.widthAnchor.constraint(equalTo: root.widthAnchor), scroll.heightAnchor.constraint(equalToConstant: 110),
+            scroll.widthAnchor.constraint(equalTo: root.widthAnchor), scroll.heightAnchor.constraint(equalToConstant: 96),
             calendarList.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             status.widthAnchor.constraint(equalTo: root.widthAnchor),
             feedRow.widthAnchor.constraint(equalTo: root.widthAnchor),
             feedList.widthAnchor.constraint(equalTo: root.widthAnchor)
         ])
+        fitToContent()
         window.center()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Sizes the window to its controls, capped to the screen's visible height.
+    private func fitToContent() {
+        guard let window, let content = window.contentView else { return }
+        content.layoutSubtreeIfNeeded()
+        let wanted = (content.subviews.first?.fittingSize.height ?? 640) + 40
+        let limit = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        window.setContentSize(NSSize(width: 560, height: min(wanted, limit - 40)))
+    }
+
     private func label(_ value: String) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: value)
         field.font = .systemFont(ofSize: 11); field.textColor = .secondaryLabelColor
@@ -135,6 +146,7 @@ final class CalendarAlarmWindow: NSWindowController {
         if displayedFeeds != feeds {
             displayedFeeds = feeds
             for view in feedList.arrangedSubviews { feedList.removeArrangedSubview(view); view.removeFromSuperview() }
+            defer { fitToContent() }
             for feed in feeds {
                 let name = NSTextField(labelWithString: feed.name); name.font = .systemFont(ofSize: 12, weight: .medium)
                 name.lineBreakMode = .byTruncatingTail
