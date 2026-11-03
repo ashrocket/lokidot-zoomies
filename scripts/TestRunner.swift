@@ -12,6 +12,7 @@ enum TestRunner {
         suite.addTest(CalendarAlarmTests.defaultTestSuite)
         suite.addTest(SavedPetLibraryTests.defaultTestSuite)
         suite.addTest(MeetingLinkTests.defaultTestSuite)
+        suite.addTest(ICSFeedTests.defaultTestSuite)
         suite.run()
         guard let result = suite.testRun, result.executionCount > 0 else { exit(2) }
         exit(result.hasSucceeded ? 0 : 1)
