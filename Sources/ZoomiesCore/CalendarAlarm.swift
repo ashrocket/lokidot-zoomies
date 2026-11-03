@@ -14,6 +14,9 @@ public struct CalendarAlarmEvent: Equatable {
     public let isDeclined: Bool
     /// One-click join link found in the event (Zoom, Meet, Teams, Webex…).
     public let joinURL: URL?
+    /// Keys of copies of this meeting from other sources, merged by
+    /// `deduplicated`. A reminder delivered for any copy counts for all.
+    public internal(set) var aliasKeys: [String] = []
 
     public init(id: String, calendarID: String, title: String, start: Date, end: Date,
                 occurrence: Date? = nil, isAllDay: Bool = false,
@@ -30,6 +33,7 @@ public struct CalendarAlarmEvent: Equatable {
         [Data(calendarID.utf8).base64EncodedString(), Data(id.utf8).base64EncodedString(),
          String(occurrence.timeIntervalSince1970)].joined(separator: ".")
     }
+    public var allKeys: [String] { [key] + aliasKeys }
 
     /// Converts parsed feed instances. Feed events use `feed:<id>` calendar IDs.
     public static func fromFeed(_ events: [FeedEvent], calendarID: String) -> [CalendarAlarmEvent] {
@@ -50,7 +54,10 @@ public struct CalendarAlarmEvent: Equatable {
         for event in events.sorted(by: { $0.start == $1.start ? $0.key < $1.key : $0.start < $1.start }) {
             let identity = "\(event.start.timeIntervalSince1970)|\(event.title.lowercased())"
             if let index = seen[identity] {
-                if result[index].joinURL == nil && event.joinURL != nil { result[index] = event }
+                var kept = result[index], other = event
+                if kept.joinURL == nil && other.joinURL != nil { swap(&kept, &other) }
+                kept.aliasKeys += other.allKeys.filter { $0 != kept.key && !kept.aliasKeys.contains($0) }
+                result[index] = kept
                 continue
             }
             seen[identity] = result.count
@@ -155,7 +162,8 @@ public struct CalendarAlarmScheduler {
     /// The next reminder instant still owed for this event, or nil.
     public func nextDate(for event: CalendarAlarmEvent, settings: CalendarAlarmSettings) -> Date? {
         let lead = settings.leadInterval
-        guard let receipt = receipts.first(where: { $0.key == event.key }) else {
+        let keys = event.allKeys
+        guard let receipt = receipts.first(where: { keys.contains($0.key) }) else {
             return event.start.addingTimeInterval(-lead)
         }
         if let snoozed = receipt.snoozedUntil { return snoozed }
@@ -197,20 +205,27 @@ public struct CalendarAlarmScheduler {
 
     private mutating func markDelivered(_ event: CalendarAlarmEvent, started: Bool) {
         let expires = event.end.addingTimeInterval(86400)
-        if let index = receipts.firstIndex(where: { $0.key == event.key }) {
-            receipts[index].snoozedUntil = nil
-            receipts[index].expires = max(receipts[index].expires, expires)
-            if started { receipts[index].startDelivered = true }
-        } else {
-            receipts.append(CalendarAlarmReceipt(key: event.key, expires: expires, startDelivered: started ? true : nil))
+        // Record every source's key, so the reminder can't repeat if the
+        // other copy of the meeting later wins deduplication.
+        let alreadyStarted = receipts.contains { event.allKeys.contains($0.key) && $0.startDelivered == true }
+        for key in event.allKeys {
+            if let index = receipts.firstIndex(where: { $0.key == key }) {
+                receipts[index].snoozedUntil = nil
+                receipts[index].expires = max(receipts[index].expires, expires)
+                if started || alreadyStarted { receipts[index].startDelivered = true }
+            } else {
+                receipts.append(CalendarAlarmReceipt(key: key, expires: expires, startDelivered: started || alreadyStarted ? true : nil))
+            }
         }
     }
 
     /// Snoozes to the meeting start when it is more than a minute away,
     /// otherwise for one minute.
     public mutating func snooze(_ event: CalendarAlarmEvent, now: Date) {
-        guard let index = receipts.firstIndex(where: { $0.key == event.key }) else { return }
-        receipts[index].snoozedUntil = Self.snoozeTarget(for: event, now: now)
+        let target = Self.snoozeTarget(for: event, now: now)
+        for index in receipts.indices where event.allKeys.contains(receipts[index].key) {
+            receipts[index].snoozedUntil = target
+        }
     }
 
     public static func snoozeTarget(for event: CalendarAlarmEvent, now: Date) -> Date {

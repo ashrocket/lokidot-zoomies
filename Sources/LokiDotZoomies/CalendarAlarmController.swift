@@ -167,7 +167,7 @@ final class CalendarAlarmController: NSObject {
     }
 
     @objc private func storeChanged() { refreshSystem() }
-    @objc private func clockChanged() { recompute() }
+    @objc private func clockChanged() { refreshSystem() }
 
     private func refreshSystem() {
         let windowOpen = settingsWindow?.window?.isVisible == true
@@ -204,11 +204,13 @@ final class CalendarAlarmController: NSObject {
 
     // MARK: Google / Outlook links
 
+    /// Every 10 minutes: re-read links, and re-query Apple Calendar so the
+    /// 36-hour look-ahead keeps moving even when the store doesn't change.
     private func scheduleFeedTimer() {
         feedTimer?.invalidate(); feedTimer = nil
-        guard settings.enabled, !settings.feeds.isEmpty else { return }
+        guard settings.enabled else { return }
         let timer = Timer(timeInterval: Self.feedRefreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshFeeds() }
+            Task { @MainActor in self?.refreshSystem(); self?.refreshFeeds() }
         }
         timer.tolerance = 30
         RunLoop.main.add(timer, forMode: .common)
@@ -216,7 +218,7 @@ final class CalendarAlarmController: NSObject {
     }
 
     private func refreshFeeds() {
-        let ids = Set(settings.feeds.map(\.id))
+        let ids = Set(settings.feeds.map(\.id) + (debugMode ? ["debug-file"] : []))
         feedEvents = feedEvents.filter { ids.contains($0.key) }
         feedStatus = feedStatus.filter { ids.contains($0.key) }
         guard settings.enabled || settingsWindow?.window?.isVisible == true else { return }
@@ -325,10 +327,12 @@ final class CalendarAlarmController: NSObject {
 
     private func tick() {
         fireTimer?.invalidate(); fireTimer = nil
-        guard sessionActive, settings.enabled else {
+        guard settings.enabled else {
             if active != nil || !queue.isEmpty { active = nil; queue = []; alertWindow?.hide() }
             return
         }
+        // While the screen sleeps, keep the card and queue; show them on wake.
+        guard sessionActive else { return }
         let now = Date()
         let before = scheduler.receipts
         for event in scheduler.due(events: events, settings: settings, now: now) {
@@ -440,6 +444,7 @@ final class CalendarAlarmController: NSObject {
             settings.feeds.append(feed); settings.calendarIDs.insert(feed.calendarID)
             fetch(feed)
         }
+        scheduleFeedTimer()
         recompute()
     }
 

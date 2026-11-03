@@ -611,7 +611,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         for meeting in soon {
             let time = meeting.start <= now ? "Now" : meeting.start.formatted(date: .omitted, time: .shortened)
             let join = meeting.joinURL.flatMap { MeetingLink.provider(for: $0) }.map { " — Join \($0)" } ?? ""
-            let item = NSMenuItem(title: "\(time)  \(String(meeting.title.prefix(48)))\(join)",
+            let title = calendarAlarms.settings.showEventTitles ? String(meeting.title.prefix(48)) : "Meeting"
+            let item = NSMenuItem(title: "\(time)  \(title)\(join)",
                                   action: meeting.joinURL == nil ? nil : #selector(joinMeeting(_:)), keyEquivalent: "")
             item.target = self; item.representedObject = meeting.joinURL
             item.isEnabled = meeting.joinURL != nil

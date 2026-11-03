@@ -110,6 +110,22 @@ final class CalendarAlarmTests: XCTestCase {
         XCTAssertEqual(CalendarFeedConfig.suggestedName(for: URL(string: "https://outlook.office365.com/owa/calendar/x/y/calendar.ics")!), "Outlook calendar")
     }
 
+    func testReminderDoesNotRepeatWhenTheOtherSourceWinsDeduplication() {
+        var scheduler = CalendarAlarmScheduler()
+        let synced = event("ek", calendar: "apple")
+        // Apple Calendar copy arrives first and is delivered.
+        XCTAssertEqual(scheduler.due(events: CalendarAlarmEvent.deduplicated([synced]), settings: settings, now: now).count, 1)
+        // The ICS copy with a join link arrives later and wins deduplication.
+        let feed = CalendarAlarmEvent(id: "ics", calendarID: "google", title: "Synthetic meeting", start: synced.start, end: synced.end,
+                                      joinURL: URL(string: "https://meet.google.com/abc-defg-hij"))
+        let merged = CalendarAlarmEvent.deduplicated([synced, feed])
+        XCTAssertEqual(merged.first?.calendarID, "google")
+        XCTAssertTrue(scheduler.due(events: merged, settings: settings, now: now.addingTimeInterval(1)).isEmpty)
+        // The start reminder still fires exactly once, and survives the feed disappearing.
+        XCTAssertEqual(scheduler.due(events: merged, settings: settings, now: now.addingTimeInterval(300)).count, 1)
+        XCTAssertTrue(scheduler.due(events: [synced], settings: settings, now: now.addingTimeInterval(301)).isEmpty)
+    }
+
     func testFeedEventsCarryJoinLinksAndDuplicatesCollapse() {
         let start = now.addingTimeInterval(300)
         let feed = FeedEvent(uid: "u1", title: "Standup", start: start, end: start.addingTimeInterval(900), occurrence: start,
