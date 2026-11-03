@@ -107,8 +107,7 @@ fileprivate struct Rule {
 
 extension ICSFeed {
     fileprivate static let eventCap = 20_000
-    fileprivate static let candidateCap = 5_000
-    fileprivate static let dayStepCap = 100_000
+    fileprivate static let periodCap = 100_000
     fileprivate static let utc = TimeZone(secondsFromGMT: 0) ?? .current
 
     fileprivate static let supportedRuleKeys: Set<String> = [
@@ -311,11 +310,27 @@ extension ICSFeed {
         }
     }
 
-    /// Parses an ISO 8601 duration such as `PT1H30M`, `P1D`, or `P1W` into calendar components.
-    fileprivate static func durationParts(_ text: String) -> DateComponents? {
+    /// Parses at most nine ASCII digits, so later arithmetic on the value cannot overflow.
+    fileprivate static func boundedInt(_ text: String) -> Int? {
+        guard text.count <= 9, isDigits(text) else { return nil }
+        return Int(text)
+    }
+
+    /// Like `boundedInt`, with an optional leading sign.
+    fileprivate static func signedInt(_ text: Substring) -> Int? {
+        if let sign = text.first, sign == "-" || sign == "+" {
+            return boundedInt(String(text.dropFirst())).map { sign == "-" ? -$0 : $0 }
+        }
+        return boundedInt(String(text))
+    }
+
+    /// Parses an ISO 8601 duration such as `PT1H30M`, `P1D`, or `P1W` into whole days and seconds.
+    /// Each total is clamped to 400 days, so hostile input cannot produce an absurd event length.
+    fileprivate static func durationParts(_ text: String) -> (days: Int, seconds: Int)? {
         let upper = text.uppercased()
         guard upper.hasPrefix("P") else { return nil }
-        var parts = DateComponents()
+        var days = 0
+        var seconds = 0
         var number = ""
         var inTime = false
         var sawUnit = false
@@ -325,29 +340,30 @@ extension ICSFeed {
             } else if character.isASCII && character.isNumber {
                 number.append(character)
             } else {
-                guard let amount = Int(number) else { return nil }
+                guard let amount = boundedInt(number) else { return nil }
                 number = ""
                 sawUnit = true
                 switch (character, inTime) {
-                case ("W", false): parts.day = (parts.day ?? 0) + 7 * amount
-                case ("D", false): parts.day = (parts.day ?? 0) + amount
-                case ("H", true): parts.hour = (parts.hour ?? 0) + amount
-                case ("M", true): parts.minute = (parts.minute ?? 0) + amount
-                case ("S", true): parts.second = (parts.second ?? 0) + amount
+                case ("W", false): days += 7 * amount
+                case ("D", false): days += amount
+                case ("H", true): seconds += 3_600 * amount
+                case ("M", true): seconds += 60 * amount
+                case ("S", true): seconds += amount
                 default: return nil
                 }
             }
         }
-        return number.isEmpty && sawUnit ? parts : nil
+        guard number.isEmpty, sawUnit else { return nil }
+        return (min(days, 400), min(seconds, 400 * 86_400))
     }
 
     /// Length of an event from DTEND, else DURATION, else a one-day all-day span or zero.
     fileprivate static func length(of start: ICSTime, end: ICSTime?, duration: String?) -> TimeInterval {
         if let end { return max(0, end.date.timeIntervalSince(start.date)) }
         let cal = calendar(start.zone)
-        if let duration, let parts = durationParts(duration),
-           let stop = cal.date(byAdding: parts, to: start.date) {
-            return max(0, stop.timeIntervalSince(start.date))
+        if let duration, let parts = durationParts(duration) {
+            let dayStop = cal.date(byAdding: .day, value: parts.days, to: start.date) ?? start.date
+            return max(0, dayStop.addingTimeInterval(TimeInterval(parts.seconds)).timeIntervalSince(start.date))
         }
         if start.isDateOnly, let stop = cal.date(byAdding: .day, value: 1, to: start.date) {
             return stop.timeIntervalSince(start.date)
@@ -355,6 +371,7 @@ extension ICSFeed {
         return 0
     }
 
+    /// True when an EXDATE or RDATE value names the same instant, or the same calendar day for date-only values.
     /// True when an EXDATE or RDATE value names the same instant, or the same calendar day for date-only values.
     fileprivate static func matches(_ time: ICSTime, _ date: Date, zone: TimeZone) -> Bool {
         guard time.isDateOnly else { return time.date == date }
@@ -392,13 +409,13 @@ extension ICSFeed {
         if days.contains(where: { $0.ordinal != nil }) && frequency != .monthly { return nil }
         var interval = 1
         if let raw = parts["INTERVAL"] {
-            guard let value = Int(raw), value >= 1 else { return nil }
-            interval = value
+            guard let value = boundedInt(raw) else { return nil }
+            interval = min(max(value, 1), 1_000)
         }
         var count: Int?
         if let raw = parts["COUNT"] {
-            guard let value = Int(raw), value >= 1 else { return nil }
-            count = value
+            guard let value = boundedInt(raw), value >= 1 else { return nil }
+            count = min(value, 100_000)
         }
         var weekStart = 2
         if let raw = parts["WKST"] {
@@ -439,17 +456,17 @@ extension ICSFeed {
         guard token.count >= 2, let weekday = weekdayNumbers[String(token.suffix(2))] else { return nil }
         let prefix = token.dropLast(2)
         if prefix.isEmpty { return (weekday, nil) }
-        guard let ordinal = Int(prefix), ordinal != 0, (-53...53).contains(ordinal) else { return nil }
+        guard let ordinal = signedInt(prefix), ordinal != 0, (-53...53).contains(ordinal) else { return nil }
         return (weekday, ordinal)
     }
 
     fileprivate static func monthDayToken(_ token: Substring) -> Int? {
-        guard let day = Int(token), day != 0, (-31...31).contains(day) else { return nil }
+        guard let day = signedInt(token), day != 0, (-31...31).contains(day) else { return nil }
         return day
     }
 
     fileprivate static func monthToken(_ token: Substring) -> Int? {
-        guard let month = Int(token), (1...12).contains(month) else { return nil }
+        guard let month = boundedInt(String(token)), (1...12).contains(month) else { return nil }
         return month
     }
 }
@@ -457,54 +474,146 @@ extension ICSFeed {
 // MARK: - Expansion
 
 extension ICSFeed {
-    /// Expands `rule` from `start` up to `window.end`. The first element is always DTSTART.
-    fileprivate static func expand(_ rule: Rule, start: Date, zone: TimeZone, window: DateInterval) -> [Date] {
-        let cal = calendar(zone)
-        let walker = Walker(rule: rule, calendar: cal, start: start)
-        let time = cal.dateComponents([.hour, .minute, .second], from: start)
-        var day = cal.startOfDay(for: start)
-        var dates = [start]
-        var index = 0
-        while dates.count < candidateCap && index < dayStepCap {
-            index += 1
-            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
-            day = next
-            guard let instance = cal.date(bySettingHour: time.hour ?? 0, minute: time.minute ?? 0,
-                                               second: time.second ?? 0, of: day) else { continue }
-            if let limit = rule.untilLimit, instance >= limit { break }
-            if instance >= window.end { break }
-            if walker.accepts(day, index: index) { dates.append(instance) }
+    /// Expands `rule` as instants that can overlap `window`. Without COUNT, leading periods that
+    /// cannot overlap the window are skipped. With COUNT, every period is counted from DTSTART.
+    /// DTSTART is always the first instance and counts toward COUNT.
+    fileprivate static func expand(_ rule: Rule, start: Date, zone: TimeZone, window: DateInterval,
+                                   length: TimeInterval) -> [Date] {
+        let walker = Walker(rule: rule, calendar: calendar(zone), start: start)
+        var index = rule.count == nil ? skippedPeriods(walker, window: window, length: length, interval: rule.interval) : 0
+        var dates: [Date] = index == 0 ? [start] : []
+        for _ in 0..<periodCap {
             if let count = rule.count, dates.count >= count { break }
+            guard let anchor = walker.anchor(index), anchor < window.end else { break }
+            for instant in walker.instances(in: index) {
+                if instant >= window.end { return dates }
+                if let limit = rule.untilLimit, instant >= limit { return dates }
+                if let count = rule.count, dates.count >= count { return dates }
+                dates.append(instant)
+            }
+            index += rule.interval
         }
         return dates
     }
+
+    /// Number of leading periods, a multiple of `interval`, that end before the window can see an instance.
+    /// One period of margin keeps a period that straddles the cutoff in the walk.
+    fileprivate static func skippedPeriods(_ walker: Walker, window: DateInterval, length: TimeInterval, interval: Int) -> Int {
+        let elapsed = walker.periodIndex(of: window.start.addingTimeInterval(-length))
+        guard elapsed > 1 else { return 0 }
+        return (elapsed - 1) / interval * interval
+    }
 }
 
-/// Decides, day by day, which calendar days a rule selects.
+/// Generates the instances of one rule period by period, starting from DTSTART's period.
 fileprivate struct Walker {
     let rule: Rule
     let calendar: Calendar
+    let start: Date
     /// Year, month, day, and weekday of DTSTART in the event zone.
     let origin: DateComponents
+    let startDay: Date
+    /// First day of the week that contains DTSTART, using WKST.
+    let weekAnchor: Date
+    /// Wall-clock time of DTSTART, in seconds after midnight.
+    let seconds: Int
     /// Months a day must fall in. A yearly rule with no day selector defaults to DTSTART's month.
     let months: [Int]
-    /// Days from the start of DTSTART's week to DTSTART.
-    let weekOffset: Int
 
     init(rule: Rule, calendar: Calendar, start: Date) {
         self.rule = rule
         self.calendar = calendar
-        origin = calendar.dateComponents([.year, .month, .day, .weekday], from: start)
-        weekOffset = ((origin.weekday ?? 1) - rule.weekStart + 7) % 7
+        self.start = start
+        let origin = calendar.dateComponents([.year, .month, .day, .weekday], from: start)
+        self.origin = origin
+        let day = calendar.startOfDay(for: start)
+        self.startDay = day
+        let offset = ((origin.weekday ?? 1) - rule.weekStart + 7) % 7
+        self.weekAnchor = calendar.date(byAdding: .day, value: -offset, to: day) ?? day
+        let time = calendar.dateComponents([.hour, .minute, .second], from: start)
+        self.seconds = (time.hour ?? 0) * 3_600 + (time.minute ?? 0) * 60 + (time.second ?? 0)
         let defaultMonth = rule.frequency == .yearly && rule.days.isEmpty && rule.monthDays.isEmpty && rule.months.isEmpty
-        months = defaultMonth ? [origin.month ?? 1] : rule.months
+        self.months = defaultMonth ? [origin.month ?? 1] : rule.months
     }
 
-    /// Returns whether `day` (the `index`-th day after DTSTART) is an occurrence day.
-    func accepts(_ day: Date, index: Int) -> Bool {
-        let parts = calendar.dateComponents([.year, .month, .day, .weekday], from: day)
+    /// First day of period `index`. Period 0 contains DTSTART.
+    func anchor(_ index: Int) -> Date? {
+        switch rule.frequency {
+        case .daily:
+            return calendar.date(byAdding: .day, value: index, to: startDay)
+        case .weekly:
+            return calendar.date(byAdding: .day, value: 7 * index, to: weekAnchor)
+        case .monthly:
+            let month = (origin.year ?? 0) * 12 + (origin.month ?? 1) - 1 + index
+            return calendar.date(from: DateComponents(year: month / 12, month: month % 12 + 1, day: 1))
+        case .yearly:
+            return calendar.date(from: DateComponents(year: (origin.year ?? 0) + index, month: 1, day: 1))
+        }
+    }
+
+    /// Index of the period containing `date`, counted from DTSTART's period.
+    func periodIndex(of date: Date) -> Int {
+        switch rule.frequency {
+        case .daily:
+            return calendar.dateComponents([.day], from: startDay, to: date).day ?? 0
+        case .weekly:
+            return (calendar.dateComponents([.day], from: weekAnchor, to: date).day ?? 0) / 7
+        case .monthly:
+            let parts = calendar.dateComponents([.year, .month], from: date)
+            return ((parts.year ?? 0) - (origin.year ?? 0)) * 12 + (parts.month ?? 0) - (origin.month ?? 0)
+        case .yearly:
+            return (calendar.dateComponents([.year], from: date).year ?? 0) - (origin.year ?? 0)
+        }
+    }
+
+    /// Wall-clock instants of period `index` that fall after DTSTART, in order.
+    func instances(in index: Int) -> [Date] {
+        days(in: index).compactMap { wallInstant($0) }.filter { $0 > start }
+    }
+
+    /// Days of period `index` that pass the rule's filters, in order.
+    private func days(in index: Int) -> [Date] {
+        guard let first = anchor(index) else { return [] }
+        let span: Int
+        switch rule.frequency {
+        case .daily: span = 1
+        case .weekly: span = 7
+        case .monthly: span = 31
+        case .yearly: span = 366
+        }
+        let bounded = rule.frequency == .monthly || rule.frequency == .yearly
+        let firstParts = calendar.dateComponents([.year, .month], from: first)
+        var result: [Date] = []
+        var day = first
+        for _ in 0..<span {
+            if bounded {
+                let parts = calendar.dateComponents([.year, .month], from: day)
+                let leftPeriod = parts.year != firstParts.year || (rule.frequency == .monthly && parts.month != firstParts.month)
+                if leftPeriod { break }
+            }
+            if accepts(day) { result.append(day) }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return result
+    }
+
+    /// The instant at DTSTART's wall-clock time on `day`. A time skipped by a DST gap moves forward
+    /// by the length of the gap, as RFC 5545 requires.
+    private func wallInstant(_ day: Date) -> Date? {
+        guard let instant = calendar.date(bySettingHour: seconds / 3_600, minute: seconds / 60 % 60,
+                                          second: seconds % 60, of: day) else {
+            return calendar.date(byAdding: .second, value: seconds, to: day)
+        }
+        let actual = calendar.dateComponents([.hour, .minute, .second], from: instant)
+        let actualSeconds = (actual.hour ?? 0) * 3_600 + (actual.minute ?? 0) * 60 + (actual.second ?? 0)
+        return actualSeconds > seconds ? instant.addingTimeInterval(TimeInterval(actualSeconds - seconds)) : instant
+    }
+
+    /// Whether `day` passes the BYMONTH, BYMONTHDAY, and BYDAY filters, or the DTSTART-based default.
+    private func accepts(_ day: Date) -> Bool {
+        let parts = calendar.dateComponents([.month, .day, .weekday], from: day)
         let month = parts.month ?? 0, dayOfMonth = parts.day ?? 0, weekday = parts.weekday ?? 1
-        guard isActivePeriod(parts, index: index) else { return false }
         if !months.isEmpty && !months.contains(month) { return false }
         if rule.monthDays.isEmpty && rule.days.isEmpty {
             switch rule.frequency {
@@ -517,21 +626,6 @@ fileprivate struct Walker {
         let dayOK = rule.monthDays.isEmpty || rule.monthDays.contains { $0 > 0 ? $0 == dayOfMonth : dayOfMonth == length + $0 + 1 }
         let weekdayOK = rule.days.isEmpty || rule.days.contains { matches($0, weekday: weekday, day: dayOfMonth, length: length) }
         return dayOK && weekdayOK
-    }
-
-    private func isActivePeriod(_ parts: DateComponents, index: Int) -> Bool {
-        let step = rule.interval
-        switch rule.frequency {
-        case .daily:
-            return index % step == 0
-        case .weekly:
-            return ((weekOffset + index) / 7) % step == 0
-        case .monthly:
-            let elapsed = ((parts.year ?? 0) - (origin.year ?? 0)) * 12 + (parts.month ?? 0) - (origin.month ?? 0)
-            return elapsed % step == 0
-        case .yearly:
-            return ((parts.year ?? 0) - (origin.year ?? 0)) % step == 0
-        }
     }
 
     /// Matches a BYDAY entry. An ordinal counts from the start of the month (positive) or its end (negative).
@@ -609,7 +703,7 @@ fileprivate struct RawEvent {
     /// Start instants of this series within the window, after EXDATE and RDATE are applied.
     func starts(window: DateInterval) -> [Date] {
         if hasUnsupportedRule { return [start.date] }
-        var dates = rule.map { ICSFeed.expand($0, start: start.date, zone: start.zone, window: window) } ?? [start.date]
+        var dates = rule.map { ICSFeed.expand($0, start: start.date, zone: start.zone, window: window, length: length) } ?? [start.date]
         dates += rdates.map(\.date)
         return Set(dates)
             .filter { date in !exdates.contains { ICSFeed.matches($0, date, zone: start.zone) } }
