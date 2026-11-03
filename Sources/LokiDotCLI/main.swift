@@ -12,8 +12,8 @@ LokiDot Zoomies — a little pack of desktop companions
   lokidot prance [all|robot-loki|beagle|whippet]
   lokidot dog FOLDER [zoomies|circle|prance]
   lokidot pause | resume | quit | status
-  lokidot calendars             Choose Apple / synced Google calendar alarms
-  lokidot alarm-test            Try a pet alarm without calendar access
+  lokidot calendars             Meeting reminders: Apple Calendar, Google or Outlook links
+  lokidot alarm-test            Try a reminder card without calendar access
   lokidot pets                  Manage saved imported pets
   lokidot unload                Put all pets away; keep them saved
   lokidot validate FOLDER        Check your dog's sprite pack

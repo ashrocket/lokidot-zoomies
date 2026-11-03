@@ -38,7 +38,7 @@ if let index = args.firstIndex(of: "--render-motion-preview") {
 } else if let index = args.firstIndex(of: "--render-preview") {
     do {
         guard let url = SpriteArtwork.initialURL() else { throw SpritePackError("Supply --pack /path/to/folder or build with a validated sprite pack.") }
-        let artwork = try SpriteArtwork(url: url)
+        let artwork = try SpriteArtwork(url: url, full: true)
         try artwork.writePreviews(to: URL(fileURLWithPath: args[index + 1], isDirectory: true))
         print("Exported \(artwork.pack.frames.count) declared states for \(artwork.name).")
     } catch { fail(error.localizedDescription) }

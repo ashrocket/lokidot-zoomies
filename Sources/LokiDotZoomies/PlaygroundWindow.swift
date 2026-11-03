@@ -66,7 +66,7 @@ final class PlaygroundWindow: NSWindowController {
         let hint = NSTextField(wrappingLabelWithString: "Add your dog saves a local copy and remembers it next time. Saved pets lets you load, unload, or remove copies. A photo alone won’t animate.")
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
         root.addArrangedSubview(hint)
-        let calendars = NSButton(title: "Calendar alarms…", target: self, action: #selector(openCalendars))
+        let calendars = NSButton(title: "Meeting reminders…", target: self, action: #selector(openCalendars))
         let saved = NSButton(title: "Saved pets…", target: self, action: #selector(openSavedPets))
         calendars.bezelStyle = .rounded; saved.bezelStyle = .rounded
         root.addArrangedSubview(NSStackView(views: [saved, calendars]))

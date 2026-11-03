@@ -47,8 +47,9 @@ public struct SavedPetLibrary {
         return children.filter { Self.isSavedID($0.lastPathComponent) }.map { child in
             let id = child.lastPathComponent
             do {
-                let pack = try SpritePack.load(directory: directory(for: id))
-                return SavedPet(id: id, name: pack.manifest.name, directory: child, problem: nil)
+                // Listing reads manifests only; artwork is decoded when a pet is shown.
+                let manifest = try SpritePack.readManifest(directory: directory(for: id))
+                return SavedPet(id: id, name: manifest.name, directory: child, problem: nil)
             } catch {
                 // One broken saved copy must not prevent other pets from loading.
                 return SavedPet(id: id, name: "Unavailable saved pet", directory: child, problem: error.localizedDescription)

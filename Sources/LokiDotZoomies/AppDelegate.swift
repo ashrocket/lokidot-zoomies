@@ -6,10 +6,23 @@ import ZoomiesCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnimationDelegate {
     enum Mode: String { case running, resting, pausedRun, pausedRest, reducedMotion, needsArtwork, unloaded }
+    /// A pack the app can show. Listing reads manifests only; artwork is
+    /// decoded when the pet actually runs and released when it leaves.
+    struct Character {
+        let id: String
+        let name: String
+        let url: URL
+        let canPrance: Bool
+        let trusted: Bool
+    }
     private var mode: Mode = .resting
-    private var repeatEnabled = true
+    /// Off by default: between reminders the whippet rests off screen, so the
+    /// app keeps no overlay window, animation or decoded artwork.
+    private var repeatEnabled = UserDefaults.standard.bool(forKey: "ambientRepeat")
     private var overlay: Overlay?
-    private var artwork: SpriteArtwork?
+    private var selectedID: String?
+    private var artworkCache: [String: SpriteArtwork] = [:]
+    private var countdownTimer: Timer?
     private var selectedDisplay: CGDirectDisplayID?
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
@@ -25,25 +38,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private let calendarAlarms = CalendarAlarmController()
     private var pendingRequests: [LaunchRequest] = []
     private var motionStyle = MotionStyle(rawValue: UserDefaults.standard.string(forKey: "motionStyle") ?? "") ?? .zoomies
-    private var canPrance: Bool { !activeArtworks.isEmpty && activeArtworks.allSatisfy(\.canPrance) }
-    private var characters: [SpriteArtwork] = []
+    private var canPrance: Bool { !activeCharacters.isEmpty && activeCharacters.allSatisfy(\.canPrance) }
+    private var characters: [Character] = []
     private let petLibrary = SavedPetLibrary(root: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.ashrocket.LokiDotZoomies", isDirectory: true)
         .appendingPathComponent("ImportedPets", isDirectory: true))
     private var savedPets: [SavedPet] = []
-    private var loadedSavedPets: [String: SpriteArtwork] = [:]
+    private var savedCharacters: [String: Character] = [:]
     private var unloadedSavedPetIDs = Set(UserDefaults.standard.stringArray(forKey: "unloadedSavedPetIDs") ?? [])
     private var petsHidden = UserDefaults.standard.bool(forKey: "petsHidden")
     private var savedPetsWindow: SavedPetsWindow?
-    private var readyCharacters: [(id: String, artwork: SpriteArtwork)] {
-        characters.map { ($0.pack.manifest.id, $0) } + savedPets.compactMap { pet in
-            loadedSavedPets[pet.id].map { (pet.id, $0) }
+    private var readyCharacters: [Character] {
+        characters + savedPets.compactMap { pet in
+            unloadedSavedPetIDs.contains(pet.id) ? nil : savedCharacters[pet.id]
         }
     }
+    private var selected: Character? { readyCharacters.first { $0.id == selectedID } }
     private var rejectedDefaults = 0
     private var showAllCharacters = CommandLine.arguments.contains("--all-ready") || UserDefaults.standard.bool(forKey: "showAllCharacters")
-    private var activeArtworks: [SpriteArtwork] {
-        showAllCharacters ? readyCharacters.map(\.artwork) : artwork.map { [$0] } ?? []
+    private var activeCharacters: [Character] {
+        showAllCharacters ? readyCharacters : selected.map { [$0] } ?? []
     }
     private var restTimer: Timer?
     private var restDeadline: TimeInterval?
@@ -63,9 +77,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             NSApp.terminate(nil)
             return
         }
+        // The owner asked for the line-drawn whippet by default. Move every
+        // existing install to it once; later choices are respected.
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: "whippetDefaultApplied") {
+            defaults.set("whippet", forKey: "selectedCharacterID")
+            defaults.set(false, forKey: "showAllCharacters")
+            defaults.removeObject(forKey: "selectedSpritePackPath")
+            defaults.set(true, forKey: "whippetDefaultApplied")
+            showAllCharacters = CommandLine.arguments.contains("--all-ready")
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "LokiDot Zoomies")
-        statusItem.button?.title = " Zoomies"
+        let icon = Bundle.main.url(forResource: "MenuBarWhippet", withExtension: "png").flatMap(NSImage.init(contentsOf:))
+        icon?.isTemplate = true
+        icon?.size = NSSize(width: 26, height: 18)
+        statusItem.button?.image = icon ?? NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "LokiDot Zoomies")
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.setAccessibilityLabel("LokiDot Zoomies")
         statusItem.menu = menu
@@ -86,19 +112,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         workspace.addObserver(self, selector: #selector(waking(_:)), name: NSWorkspace.screensDidWakeNotification, object: nil)
         workspace.addObserver(self, selector: #selector(sleeping(_:)), name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
         workspace.addObserver(self, selector: #selector(waking(_:)), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
-        configureDisplay()
+        if repeatEnabled { configureDisplay(play: true) } else { settleMode() }
         updateMenu()
         for request in pendingRequests { accept(request) }
         pendingRequests.removeAll()
-        if !CommandLine.arguments.contains("--background") { showPlayground() }
-        updates.start()
+        // Once reminders are on, the app starts quietly in the menu bar.
+        if !CommandLine.arguments.contains("--background") && !calendarAlarms.settings.enabled { showPlayground() }
+        // The update check is not urgent; keep it off the launch path.
+        Timer.scheduledTimer(withTimeInterval: 90, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.updates.start() }
+        }
         calendarAlarms.onPetAlert = { [weak self] in
             // Reminders stay visible when pets are paused or Reduce Motion is on.
             // Only a resting, unpaused pet starts a new lap.
             guard let self, self.mode == .resting else { return }
             self.startLap()
         }
+        calendarAlarms.onUpcomingChanged = { [weak self] in self?.refreshCountdown() }
         calendarAlarms.start()
+        refreshCountdown()
 
         if let index = CommandLine.arguments.firstIndex(of: "--diagnostics"), CommandLine.arguments.count > index + 1 {
             let url = URL(fileURLWithPath: CommandLine.arguments[index + 1])
@@ -108,41 +140,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         }
     }
 
-    private func configureDisplay() {
-        guard !petsHidden, !activeArtworks.isEmpty else {
+    /// Reflects the resting state without creating a window.
+    private func settleMode() {
+        if petsHidden { mode = .unloaded }
+        else if activeCharacters.isEmpty { mode = .needsArtwork }
+        else if reducedMotion { mode = .reducedMotion }
+        else if mode != .pausedRest && mode != .pausedRun { mode = .resting }
+    }
+
+    /// Decodes only the active pets. Everything else is released.
+    private func loadActiveArtworks() -> [SpriteArtwork] {
+        var kept: [String: SpriteArtwork] = [:]
+        var result: [SpriteArtwork] = []
+        for character in activeCharacters {
+            if let cached = artworkCache[character.id] { kept[character.id] = cached; result.append(cached); continue }
+            do {
+                let artwork = try SpriteArtwork(url: character.url, trusted: character.trusted)
+                kept[character.id] = artwork; result.append(artwork)
+            } catch {
+                NSLog("LokiDot could not load %@: %@", character.name, error.localizedDescription)
+            }
+        }
+        artworkCache = kept
+        return result
+    }
+
+    private func teardownOverlay() {
+        overlay?.settle(); overlay?.window.close(); overlay = nil
+        artworkCache.removeAll()
+    }
+
+    /// Rebuilds the overlay for the current pets and display. With `play` the
+    /// pet takes a lap now; otherwise an existing ambient pet is replaced.
+    private func configureDisplay(play: Bool = false) {
+        guard !petsHidden, !activeCharacters.isEmpty else {
             restTimer?.invalidate(); restTimer = nil; restDeadline = nil
             resumeAfterWake = false
-            overlay?.settle(); overlay?.window.close(); overlay = nil
+            teardownOverlay()
             mode = petsHidden ? .unloaded : .needsArtwork
             updateMenu(); return
         }
-        let screens = NSScreen.screens
-        guard let screen = screens.first(where: { displayID($0) == selectedDisplay })
-            ?? screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
-            ?? screens.first else { return }
         let wasPaused = mode == .pausedRun || mode == .pausedRest
         restTimer?.invalidate()
         restTimer = nil
+        guard play || overlay != nil || repeatEnabled else { settleMode(); rebuildDisplayMenu(); updateMenu(); return }
+        guard buildOverlay() else { updateMenu(); return }
         mode = .resting
-        overlay?.settle()
-        overlay?.window.close()
-        selectedDisplay = displayID(screen)
-        overlay = Overlay(screen: screen, artworks: activeArtworks)
-        rebuildDisplayMenu()
-        overlay?.window.orderFrontRegardless()
         if reducedMotion { mode = .reducedMotion }
-        else if wasPaused { mode = .pausedRest }
+        else if wasPaused && !play { mode = .pausedRest }
         else { startLap() }
         updateMenu()
     }
 
+    @discardableResult
+    private func buildOverlay() -> Bool {
+        let screens = NSScreen.screens
+        guard let screen = screens.first(where: { displayID($0) == selectedDisplay })
+            ?? screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
+            ?? screens.first else { return false }
+        teardownOverlay()
+        let artworks = loadActiveArtworks()
+        guard !artworks.isEmpty else { mode = .needsArtwork; return false }
+        selectedDisplay = displayID(screen)
+        overlay = Overlay(screen: screen, artworks: artworks)
+        rebuildDisplayMenu()
+        if screensAwake && userSessionActive { overlay?.window.orderFrontRegardless() }
+        return true
+    }
+
     private func startLap() {
         guard !petsHidden else { mode = .unloaded; updateMenu(); return }
-        guard !activeArtworks.isEmpty else { mode = .needsArtwork; updateMenu(); return }
+        guard !activeCharacters.isEmpty else { mode = .needsArtwork; updateMenu(); return }
         guard !reducedMotion else { mode = .reducedMotion; updateMenu(); return }
         restTimer?.invalidate()
         restTimer = nil
         restDeadline = nil
+        if overlay == nil { guard buildOverlay() else { updateMenu(); return } }
+        if motionStyle == .prance && !canPrance { motionStyle = .zoomies }
         mode = .running
         overlay?.run(style: motionStyle, delegate: self)
         updateMenu()
@@ -156,8 +230,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private func lapFinished() {
         guard mode == .running else { return }
         mode = .resting
-        overlay?.settle()
-        if repeatEnabled { scheduleRest(seconds: MotionRoute.restDuration) }
+        if repeatEnabled {
+            overlay?.settle()
+            scheduleRest(seconds: MotionRoute.restDuration)
+        } else {
+            // The whippet leaves the screen and its frames are freed until the
+            // next reminder or a manual Zoomies!
+            teardownOverlay()
+        }
         updateMenu()
     }
 
@@ -176,7 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     @objc private func zoomies() {
         switch mode {
-        case .unloaded: setPetsHidden(false); configureDisplay()
+        case .unloaded: setPetsHidden(false); configureDisplay(play: true)
         case .pausedRun: togglePause()
         case .resting, .pausedRest: startLap()
         case .running, .reducedMotion, .needsArtwork: break
@@ -206,9 +286,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     @objc private func toggleRepeat() {
         repeatEnabled.toggle()
+        UserDefaults.standard.set(repeatEnabled, forKey: "ambientRepeat")
         if mode == .resting {
-            if repeatEnabled { scheduleRest(seconds: MotionRoute.restDuration) }
-            else { restTimer?.invalidate(); restTimer = nil; restDeadline = nil }
+            if repeatEnabled { startLap() }
+            else { restTimer?.invalidate(); restTimer = nil; restDeadline = nil; teardownOverlay() }
         }
         updateMenu()
     }
@@ -218,10 +299,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         configureDisplay()
     }
 
-    @objc private func displaysChanged() { configureDisplay() }
+    @objc private func displaysChanged() {
+        if overlay != nil { configureDisplay() } else { rebuildDisplayMenu() }
+    }
 
     @objc private func accessibilityChanged() {
-        guard !petsHidden, !activeArtworks.isEmpty else { return }
+        guard !petsHidden, !activeCharacters.isEmpty else { return }
         if reducedMotion {
             restTimer?.invalidate()
             restTimer = nil
@@ -229,7 +312,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             overlay?.settle(keepPosition: true)
         } else if mode == .reducedMotion {
             overlay?.settle()
-            startLap()
+            mode = .resting
+            if repeatEnabled { startLap() } else { teardownOverlay() }
         }
         updateMenu()
     }
@@ -250,6 +334,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         else { userSessionActive = true }
         guard screensAwake && userSessionActive else { return }
         calendarAlarms.setSessionActive(true)
+        refreshCountdown()
         overlay?.window.orderFrontRegardless()
         if resumeAfterWake {
             resumeAfterWake = false
@@ -268,34 +353,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let saved = try saveImportedArtwork(SpriteArtwork(url: url))
-            activateCharacter(id: saved.id, candidate: saved.artwork)
+            let saved = try saveImportedPack(at: url)
+            activateCharacter(id: saved.id)
         } catch {
             showArtworkError(error)
         }
     }
 
+    /// Reads bundled manifests only. Bundled packs were validated at build time.
     private func loadCharacters() {
-        guard let root = Bundle.main.resourceURL?.appendingPathComponent("Characters", isDirectory: true),
-              let folders = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else { return }
-        for url in folders.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        var folders: [URL] = []
+        if let root = Bundle.main.resourceURL?.appendingPathComponent("Characters", isDirectory: true),
+           let children = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+            folders = children.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        }
+        if !CommandLine.arguments.contains("--pack"), let custom = SpriteArtwork.initialURL() { folders.insert(custom, at: 0) }
+        for url in folders {
             guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
             do {
-                let candidate = try SpriteArtwork(url: url)
-                guard !characters.contains(where: { $0.pack.manifest.id == candidate.pack.manifest.id }) else {
-                    rejectedDefaults += 1; continue
-                }
-                characters.append(candidate)
+                let manifest = try SpritePack.readManifest(directory: url)
+                guard !characters.contains(where: { $0.id == manifest.id }) else { rejectedDefaults += 1; continue }
+                characters.append(Character(id: manifest.id, name: manifest.name, url: url,
+                                            canPrance: manifest.animations["jumping"] != nil, trusted: true))
             } catch { rejectedDefaults += 1 }
         }
     }
 
     private func loadInitialArtwork() {
         do {
-            // Explicit input and saved choices never silently fall back to Loki.
+            // Explicit input and saved choices never silently fall back to another dog.
             if CommandLine.arguments.contains("--pack"), let url = SpriteArtwork.initialURL() {
-                let saved = try saveImportedArtwork(SpriteArtwork(url: url))
-                artwork = saved.artwork
+                let saved = try saveImportedPack(at: url)
+                selectedID = saved.id
                 rememberSelection(saved.id)
                 setPetsHidden(false)
                 showAllCharacters = false
@@ -303,18 +392,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             } else if let saved = UserDefaults.standard.string(forKey: "selectedSpritePackPath") {
                 // Migrate the previously remembered external folder once. The old
                 // path is cleared only after a complete managed copy exists.
-                let migrated = try saveImportedArtwork(SpriteArtwork(url: URL(fileURLWithPath: saved, isDirectory: true)))
-                artwork = migrated.artwork
+                let migrated = try saveImportedPack(at: URL(fileURLWithPath: saved, isDirectory: true))
+                selectedID = migrated.id
                 rememberSelection(migrated.id)
             } else if let id = UserDefaults.standard.string(forKey: "selectedCharacterID") {
-                guard let selected = readyCharacters.first(where: { $0.id == id }) else {
+                guard readyCharacters.contains(where: { $0.id == id }) else {
                     throw SpritePackError("The saved character is unavailable. Choose a ready character or import a complete pack.")
                 }
-                artwork = selected.artwork
-            } else if let url = SpriteArtwork.initialURL() {
-                artwork = try SpriteArtwork(url: url)
+                selectedID = id
             } else {
-                artwork = characters.first(where: { $0.pack.manifest.id == "robot-loki" }) ?? characters.first
+                selectedID = (characters.first(where: { $0.id == "whippet" }) ?? characters.first)?.id
             }
         } catch { showArtworkError(error) }
         if readyCharacters.isEmpty { showAllCharacters = false }
@@ -323,19 +410,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     @objc private func selectCharacter(_ item: NSMenuItem) {
         guard let id = item.representedObject as? String,
-              let selected = readyCharacters.first(where: { $0.id == id }) else { return }
-        activateCharacter(id: id, candidate: selected.artwork)
+              readyCharacters.contains(where: { $0.id == id }) else { return }
+        activateCharacter(id: id)
     }
 
-    private func activateCharacter(id: String, candidate: SpriteArtwork) {
-        artwork = candidate
+    private func activateCharacter(id: String) {
+        selectedID = id
         showAllCharacters = false
         setPetsHidden(false)
         UserDefaults.standard.set(false, forKey: "showAllCharacters")
         rememberSelection(id)
         if motionStyle == .prance && !canPrance { motionStyle = .zoomies }
         rebuildCharacterMenu()
-        configureDisplay()
+        configureDisplay(play: true)
     }
 
     @objc private func selectAllCharacters() {
@@ -348,7 +435,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             UserDefaults.standard.set(motionStyle.rawValue, forKey: "motionStyle")
         }
         rebuildCharacterMenu()
-        configureDisplay()
+        configureDisplay(play: true)
     }
 
     private func showArtworkError(_ error: Error, title: String = "Sprite pack could not be loaded") {
@@ -369,17 +456,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         choices.addItem(all)
         choices.addItem(.separator())
         for candidate in readyCharacters {
-            let title = candidate.artwork.name + (SavedPetLibrary.isSavedID(candidate.id) ? " · Saved" : "")
+            let title = candidate.name + (SavedPetLibrary.isSavedID(candidate.id) ? " · Saved" : "")
             let item = NSMenuItem(title: title, action: #selector(selectCharacter(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = candidate.id
-            item.state = !showAllCharacters && artwork?.sourceURL == candidate.artwork.sourceURL ? .on : .off
+            item.state = !showAllCharacters && selectedID == candidate.id ? .on : .off
             choices.addItem(item)
-        }
-        if let artwork, !readyCharacters.contains(where: { $0.artwork.sourceURL == artwork.sourceURL }) {
-            let current = NSMenuItem(title: "\(artwork.name) · Imported", action: nil, keyEquivalent: "")
-            current.state = showAllCharacters ? .off : .on; current.isEnabled = false
-            choices.addItem(current)
         }
         if rejectedDefaults > 0 {
             let notice = NSMenuItem(title: "\(rejectedDefaults) incomplete pack(s) unavailable", action: nil, keyEquivalent: "")
@@ -421,40 +503,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         case .pause:
             if mode == .running || mode == .resting { togglePause() }; return
         case .resume:
-            if petsHidden { setPetsHidden(false); configureDisplay(); return }
+            if petsHidden { setPetsHidden(false); configureDisplay(play: true); return }
             if mode == .pausedRun || mode == .pausedRest { togglePause() }; return
         case .show, .play: break
         }
         do {
-            var candidate = artwork
+            var candidate = selectedID
             var all = showAllCharacters
-            var selectedID = request.character
             if let path = request.packPath {
-                candidate = try SpriteArtwork(url: URL(fileURLWithPath: path, isDirectory: true)); all = false
+                candidate = try saveImportedPack(at: URL(fileURLWithPath: path, isDirectory: true)).id; all = false
             } else if let id = request.character {
                 if id == "all" { all = true }
-                else if let selected = readyCharacters.first(where: { $0.id == id }) { candidate = selected.artwork; all = false }
-                else { throw SpritePackError("That dog is unavailable. Try robot-loki, beagle, whippet, loki-vampire, or all.") }
+                else if readyCharacters.contains(where: { $0.id == id }) { candidate = id; all = false }
+                else { throw SpritePackError("That dog is unavailable. Try whippet, beagle, robot-loki, loki-vampire, or all.") }
             }
             let selectedStyle = request.motion ?? motionStyle
-            let selectedPacks = all ? readyCharacters.map(\.artwork) : candidate.map { [$0] } ?? []
+            let selectedPacks = all ? readyCharacters : readyCharacters.filter { $0.id == candidate }
             guard !selectedPacks.isEmpty else { throw SpritePackError("Add a complete sprite pack first.") }
             guard selectedStyle != .prance || selectedPacks.allSatisfy(\.canPrance) else {
                 throw SpritePackError("Prancing needs a pet-v2 pack with jumping poses. This dog can still do zoomies and little circles.")
             }
-            if request.packPath != nil, let imported = candidate {
-                let saved = try saveImportedArtwork(imported)
-                candidate = saved.artwork; selectedID = saved.id
-            }
-            artwork = candidate; showAllCharacters = all; motionStyle = selectedStyle
+            selectedID = candidate; showAllCharacters = all; motionStyle = selectedStyle
             UserDefaults.standard.set(all, forKey: "showAllCharacters")
             UserDefaults.standard.set(selectedStyle.rawValue, forKey: "motionStyle")
-            if let id = selectedID, id != "all" { rememberSelection(id) }
+            if !all, let candidate { rememberSelection(candidate) }
             rebuildCharacterMenu()
             if request.action == .play || request.character != nil || request.packPath != nil || request.motion != nil {
                 setPetsHidden(false)
                 mode = .resting
-                configureDisplay()
+                configureDisplay(play: true)
             }
             if request.action == .show { showPlayground() }
             updateMenu()
@@ -471,10 +548,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         if playground == nil {
             let controller = PlaygroundWindow()
             controller.onPlay = { [weak self] id, style in
-                guard let self else { return }
-                let request = try? LaunchRequest(action: .play, motion: style, character: id == "imported" ? nil : id,
-                                                 packPath: id == "imported" ? self.artwork?.sourceURL.path : nil)
-                if let request { self.accept(request) }
+                if let request = try? LaunchRequest(action: .play, motion: style, character: id) { self?.accept(request) }
             }
             controller.onPause = { [weak self] in self?.togglePause() }
             controller.onImport = { [weak self] in self?.chooseArtwork() }
@@ -483,8 +557,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             controller.onUnload = { [weak self] in self?.unloadPets() }
             playground = controller
         }
-        updateMenu()
         playground?.present()
+        updateMenu()
     }
 
     private func buildApplicationMenu() {
@@ -492,7 +566,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         appMenu.autoenablesItems = false
         let show = NSMenuItem(title: "Show LokiDot Zoomies", action: #selector(showPlayground), keyEquivalent: "0")
         show.target = self; appMenu.addItem(show); appMenu.addItem(.separator())
-        let calendars = NSMenuItem(title: "Calendar alarms…", action: #selector(showCalendarAlarms), keyEquivalent: ",")
+        let calendars = NSMenuItem(title: "Meeting reminders…", action: #selector(showCalendarAlarms), keyEquivalent: ",")
         calendars.target = self; appMenu.addItem(calendars); appMenu.addItem(.separator())
         let saved = NSMenuItem(title: "Saved pets…", action: #selector(showSavedPets), keyEquivalent: "")
         saved.target = self; appMenu.addItem(saved)
@@ -507,12 +581,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     func applicationWillTerminate(_ notification: Notification) {
         calendarAlarms.stop()
+        countdownTimer?.invalidate()
         updates.stop()
         restTimer?.invalidate()
         overlay?.window.close()
     }
 
-    func menuWillOpen(_ menu: NSMenu) { updateMenu() }
+    func menuWillOpen(_ menu: NSMenu) { rebuildMeetingItems(); updateMenu() }
+
+    private var meetingItems: [NSMenuItem] = []
+
+    /// The next few meetings, newest data first, with one-click Join.
+    private func rebuildMeetingItems() {
+        for item in meetingItems { menu.removeItem(item) }
+        meetingItems.removeAll()
+        let now = Date()
+        let soon = calendarAlarms.upcoming.filter { $0.end > now && $0.start < now.addingTimeInterval(12 * 3600) }.prefix(4)
+        guard calendarAlarms.settings.enabled else { return }
+        var items: [NSMenuItem] = []
+        if soon.isEmpty {
+            let none = NSMenuItem(title: "No meetings in the next 12 hours", action: nil, keyEquivalent: "")
+            none.isEnabled = false; items.append(none)
+        }
+        for meeting in soon {
+            let time = meeting.start <= now ? "Now" : meeting.start.formatted(date: .omitted, time: .shortened)
+            let join = meeting.joinURL.flatMap { MeetingLink.provider(for: $0) }.map { " — Join \($0)" } ?? ""
+            let item = NSMenuItem(title: "\(time)  \(String(meeting.title.prefix(48)))\(join)",
+                                  action: meeting.joinURL == nil ? nil : #selector(joinMeeting(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = meeting.joinURL
+            item.isEnabled = meeting.joinURL != nil
+            items.append(item)
+        }
+        items.append(.separator())
+        for (offset, item) in items.enumerated() { menu.insertItem(item, at: 1 + offset) }
+        meetingItems = items
+    }
+
+    @objc private func joinMeeting(_ item: NSMenuItem) {
+        guard let url = item.representedObject as? URL else { return }
+        calendarAlarms.join(url)
+    }
+
+    /// Menu-bar countdown to the next meeting in the coming hour. The timer
+    /// fires once per minute only while a meeting is that close.
+    private func refreshCountdown() {
+        countdownTimer?.invalidate(); countdownTimer = nil
+        guard let button = statusItem?.button else { return }
+        let now = Date()
+        var title = "", wake: Date?
+        if calendarAlarms.settings.enabled,
+           let next = calendarAlarms.upcoming.first(where: { $0.end > now && $0.start > now.addingTimeInterval(-600) }) {
+            let untilStart = next.start.timeIntervalSince(now)
+            var label = ""
+            if untilStart <= 0 {
+                label = "now"; wake = min(next.end, next.start.addingTimeInterval(600))
+            } else if untilStart <= 3600 {
+                let minutes = Int(ceil(untilStart / 60))
+                label = "\(minutes)m"
+                wake = now.addingTimeInterval(untilStart - Double(minutes - 1) * 60)
+            } else {
+                wake = next.start.addingTimeInterval(-3600)
+            }
+            if !label.isEmpty {
+                title = calendarAlarms.settings.showEventTitles ? " \(String(next.title.prefix(18))) · \(label)" : " \(label)"
+            }
+        }
+        if button.title != title { button.title = title }
+        if let wake {
+            let timer = Timer(fire: max(wake, now.addingTimeInterval(1)), interval: 0, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.refreshCountdown() }
+            }
+            timer.tolerance = 1
+            RunLoop.main.add(timer, forMode: .common)
+            countdownTimer = timer
+        }
+    }
 
     private func buildMenu() {
         menu.autoenablesItems = false
@@ -520,7 +663,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
         add("Show playground…", action: #selector(showPlayground), key: "")
-        add("Calendar alarms…", action: #selector(showCalendarAlarms), key: "")
+        add("Meeting reminders…", action: #selector(showCalendarAlarms), key: ",")
         add("Saved pets…", action: #selector(showSavedPets), key: "")
         add("Put pets away", action: #selector(unloadPets), key: "")
         menu.addItem(.separator())
@@ -551,11 +694,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     private func updateMenu() {
         guard statusLabel != nil else { return }
         let status: String
-        let petName = showAllCharacters ? "\(readyCharacters.count) pets" : artwork?.name ?? "Your pet"
+        let petName = showAllCharacters ? "\(readyCharacters.count) pets" : selected?.name ?? "Your pet"
         let verb = showAllCharacters ? "are" : "is"
         switch mode {
         case .running: status = "\(petName) · \(motionStyle.title.lowercased())"
-        case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "\(petName) \(verb) resting"
+        case .resting: status = repeatEnabled ? "Catching a breath · repeats gently" : "\(petName) \(verb) waiting for your next reminder"
         case .pausedRun, .pausedRest: status = "\(petName) \(verb) paused"
         case .reducedMotion: status = "Resting · Reduce Motion is on"
         case .needsArtwork: status = "Import a complete sprite pack to begin"
@@ -566,25 +709,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         zoomiesItem.isEnabled = mode != .needsArtwork && mode != .reducedMotion && mode != .running
         let paused = mode == .pausedRun || mode == .pausedRest
         pauseItem.title = paused ? "Resume" : "Pause"
-        pauseItem.isEnabled = mode != .needsArtwork && mode != .reducedMotion && !petsHidden
+        pauseItem.isEnabled = mode != .needsArtwork && mode != .reducedMotion && !petsHidden && (overlay != nil || repeatEnabled)
         repeatItem.isEnabled = mode != .needsArtwork
         repeatItem.state = repeatEnabled ? .on : .off
         statusItem.button?.toolTip = "LokiDot Zoomies — \(status)"
-        statusItem.button?.title = showAllCharacters ? " All Pets" : " \(String((artwork?.name ?? "Zoomies").prefix(16)))"
+        refreshCountdown()
         for item in motionItem?.submenu?.items ?? [] {
             let style = item.representedObject as? String
             item.state = style == motionStyle.rawValue ? .on : .off
             item.isEnabled = mode != .needsArtwork && (style != "prance" || canPrance)
         }
-        var choices = readyCharacters.map { (id: $0.id, name: $0.artwork.name + (SavedPetLibrary.isSavedID($0.id) ? " · Saved" : ""), canPrance: $0.artwork.canPrance) }
-        if readyCharacters.count > 1 { choices.insert((id: "all", name: "The whole pack", canPrance: readyCharacters.allSatisfy(\.artwork.canPrance)), at: 0) }
-        if let artwork, !readyCharacters.contains(where: { $0.artwork.sourceURL == artwork.sourceURL }) {
-            choices.append((id: "imported", name: artwork.name + " · Your dog", canPrance: artwork.canPrance))
-        }
-        let selected = showAllCharacters ? "all" : readyCharacters.first(where: { $0.artwork.sourceURL == artwork?.sourceURL })?.id ?? "imported"
-        playground?.update(characters: choices, selected: selected, motion: motionStyle, status: status,
-                           paused: paused, canPlay: !choices.isEmpty, canPause: !activeArtworks.isEmpty && !reducedMotion && !petsHidden,
-                           petsHidden: petsHidden)
+        guard let playground, playground.window?.isVisible == true else { return }
+        var choices = readyCharacters.map { (id: $0.id, name: $0.name + (SavedPetLibrary.isSavedID($0.id) ? " · Saved" : ""), canPrance: $0.canPrance) }
+        if readyCharacters.count > 1 { choices.insert((id: "all", name: "The whole pack", canPrance: readyCharacters.allSatisfy(\.canPrance)), at: 0) }
+        let current = showAllCharacters ? "all" : selectedID ?? "whippet"
+        playground.update(characters: choices, selected: current, motion: motionStyle, status: status,
+                          paused: paused, canPlay: !choices.isEmpty, canPause: !activeCharacters.isEmpty && !reducedMotion && !petsHidden,
+                          petsHidden: petsHidden)
     }
 
     private func rebuildDisplayMenu() {
@@ -617,21 +758,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
 
     private func reloadSavedPets() throws {
         savedPets = try petLibrary.pets()
-        var loaded: [String: SpriteArtwork] = [:]
-        for pet in savedPets where pet.problem == nil && !unloadedSavedPetIDs.contains(pet.id) {
-            loaded[pet.id] = try? SpriteArtwork(url: pet.directory)
+        var entries: [String: Character] = [:]
+        for pet in savedPets where pet.problem == nil {
+            guard let manifest = try? SpritePack.readManifest(directory: pet.directory) else { continue }
+            entries[pet.id] = Character(id: pet.id, name: manifest.name, url: pet.directory,
+                                        canPrance: manifest.animations["jumping"] != nil, trusted: false)
         }
-        loadedSavedPets = loaded
+        savedCharacters = entries
         updateSavedPetsWindow()
     }
 
-    private func saveImportedArtwork(_ imported: SpriteArtwork) throws -> (id: String, artwork: SpriteArtwork) {
-        let pet = try petLibrary.save(imported.pack)
-        let saved = try SpriteArtwork(url: pet.directory)
+    /// Imports validate every byte and pixel, then save a managed copy. The
+    /// display copy is decoded later, only when the pet runs.
+    private func saveImportedPack(at url: URL) throws -> SavedPet {
+        let pet = try petLibrary.save(SpritePack.load(directory: url))
         unloadedSavedPetIDs.remove(pet.id)
         UserDefaults.standard.set(unloadedSavedPetIDs.sorted(), forKey: "unloadedSavedPetIDs")
         try reloadSavedPets()
-        return (pet.id, saved)
+        return pet
     }
 
     private func rememberSelection(_ id: String) {
@@ -664,28 +808,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     private func updateSavedPetsWindow() {
-        savedPetsWindow?.update(savedPets.map { .init(pet: $0, loaded: loadedSavedPets[$0.id] != nil) })
+        savedPetsWindow?.update(savedPets.map { .init(pet: $0, loaded: savedCharacters[$0.id] != nil && !unloadedSavedPetIDs.contains($0.id)) })
     }
 
     private func loadSavedPet(_ id: String) {
         do {
-            let candidate = try SpriteArtwork(url: petLibrary.directory(for: id))
+            let directory = try petLibrary.directory(for: id)
+            _ = try SpriteArtwork(url: directory) // Check the artwork before it joins the pack.
             unloadedSavedPetIDs.remove(id)
             UserDefaults.standard.set(unloadedSavedPetIDs.sorted(), forKey: "unloadedSavedPetIDs")
-            loadedSavedPets[id] = candidate
-            activateCharacter(id: id, candidate: candidate)
+            try reloadSavedPets()
+            activateCharacter(id: id)
             updateSavedPetsWindow()
         } catch { showArtworkError(error) }
     }
 
     private func unloadSavedPet(_ id: String) {
-        guard let pet = savedPets.first(where: { $0.id == id }) else { return }
-        let selected = artwork?.sourceURL == pet.directory
-        loadedSavedPets.removeValue(forKey: id)
+        guard savedPets.contains(where: { $0.id == id }) else { return }
+        let wasSelected = selectedID == id
         unloadedSavedPetIDs.insert(id)
         UserDefaults.standard.set(unloadedSavedPetIDs.sorted(), forKey: "unloadedSavedPetIDs")
-        if selected {
-            artwork = nil
+        if wasSelected {
+            selectedID = nil
             UserDefaults.standard.removeObject(forKey: "selectedCharacterID")
             UserDefaults.standard.removeObject(forKey: "selectedSpritePackPath")
             if !showAllCharacters { setPetsHidden(true) }
@@ -715,15 +859,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
         let report: [String: Any] = [
             "pid": ProcessInfo.processInfo.processIdentifier,
             "characterCount": overlay?.petCount ?? 0,
+            "decodedArtworkCount": artworkCache.count,
+            "overlayExists": overlay != nil,
             "savedPetCount": savedPets.count,
-            "loadedSavedPetCount": loadedSavedPets.count,
+            "loadedSavedPetCount": savedCharacters.keys.filter { !unloadedSavedPetIDs.contains($0) }.count,
             "petsHidden": petsHidden,
             "showAllCharacters": showAllCharacters,
             "mode": mode.rawValue,
             "motion": motionStyle.rawValue,
             "bundlePath": Bundle.main.bundlePath,
             "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") ?? "unknown",
-            "characters": activeArtworks.map { $0.pack.manifest.id },
+            "characters": activeCharacters.map(\.id),
             "playgroundVisible": playground?.window?.isVisible ?? false,
             "reduceMotion": reducedMotion,
             "repeatEnabled": repeatEnabled,

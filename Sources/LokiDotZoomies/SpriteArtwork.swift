@@ -18,8 +18,14 @@ final class SpriteArtwork {
         return frames[min(frames.count - 1, Int(max(0, min(1, progress)) * Double(frames.count)))]
     }
 
-    init(url: URL) throws {
-        pack = try SpritePack.load(directory: url)
+    /// The app draws only idle[0], both running directions and the jumping poses.
+    static let displayFrames = ["idle": 1, "running-left": 64, "running-right": 64, "jumping": 64]
+
+    /// `full` keeps every state and the PNG bytes (previews, imports). The
+    /// default display load keeps about 3.5 MB of frames for one pet-v2 dog.
+    init(url: URL, trusted: Bool = false, full: Bool = false) throws {
+        pack = try SpritePack.load(directory: url, trusted: trusted,
+                                   frameLimits: full ? nil : Self.displayFrames, keepImageData: full)
         sourceURL = url
     }
 

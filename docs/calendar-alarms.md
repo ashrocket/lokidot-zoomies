@@ -1,50 +1,91 @@
-# Let your pet watch the clock
+# Meeting reminders
 
-Calendar alarms are available in the **Mac source build**. The published 1.3.2 installers and Windows preview do not include this feature yet.
+LokiDot Zoomies reminds you about meetings. Before a meeting, the whippet runs across your screen. A card shows the meeting title, the start time and a **Join** button. The menu bar shows the time to your next meeting.
 
-Open **Calendar alarms…** in the playground or paw menu, or run:
+Meeting reminders are in the Mac source build 2.0.0. The published 1.3.2 installers and the Windows preview do not have them.
 
-```sh
-lokidot calendars
-```
+## Set up
 
-1. Click **Connect calendars…** and respond to the macOS permission prompt.
-2. Select the calendars you want your pet to watch. Each one shows its account/source name.
-3. Choose **At the start**, or **1, 5, 10, or 15 minutes before**.
-4. Turn on **Let my pets remind me**.
+1. Open **Meeting reminders…** in the paw menu or the playground. You can also run `lokidot calendars`.
+2. Connect a calendar source. Use one or more of the sources below.
+3. Make sure **Remind me about meetings** is on.
+4. Turn on **Open LokiDot at login**. If the app is not open, it cannot remind you.
 
-An upcoming event brings up a small pet-alarm card and, if enabled, a gentle sound. A resting pet takes a lap. Paused pets stay paused, and Reduce Motion keeps them still. **Snooze 5 min** reminds you again; **Dismiss** closes that reminder. Simultaneous reminders are shown in turn. All-day events, cancelled events, and invitations you declined are skipped.
+To see a reminder card without a calendar, click **Try a reminder** or run `lokidot alarm-test`.
 
-Try it without connecting a calendar:
+## Calendar sources
 
-```sh
-lokidot alarm-test
-```
+| Calendar | Recommended source |
+| --- | --- |
+| iCloud and local calendars | Apple Calendar |
+| Google Calendar | Apple Calendar (Google account on this Mac), or the Google link |
+| Outlook.com and Microsoft 365 | The Outlook link |
 
-Or click **Try a pet alarm**. The test never creates an event or requests calendar access.
+### Apple Calendar
 
-## Apple Calendar
+Click **Connect Apple Calendar…** and allow access when macOS asks. Then select the calendars to watch. Each calendar shows its account name.
 
-Any event calendar visible to this Mac through Apple's calendar system can be selected: iCloud, local calendars, and supported synced accounts. Allow LokiDot when macOS asks. macOS 14 and later call the permission **full access**, because EventKit has no read-only permission for fetching events. LokiDot only reads events; it never creates, edits or deletes them. On macOS 13 the older calendar permission is used.
+This source includes every account that you added to Apple Calendar: iCloud, Google, Exchange and others. macOS 14 and later call the permission **full access**, because EventKit has no read-only permission. LokiDot only reads events. It never creates, changes or deletes them.
 
-If access was denied, allow LokiDot in **System Settings → Privacy & Security → Calendars**, then click **Refresh**. The app stays usable without calendar access. A newly signed development build may need permission again.
+If you denied access, open **System Settings → Privacy & Security → Calendars**, allow LokiDot, and click **Refresh**.
 
-## Google Calendar
+### Google Calendar link
 
-Add Google to **Apple Calendar → Settings → Accounts → + → Google**, sign in through Google's normal flow, and enable Calendars. Wait until those events appear in Apple Calendar, then refresh LokiDot and select the Google calendars you want.
+Use this source when your Google account is not in Apple Calendar.
 
-This integration reads Google's calendars through macOS sync. It does not sign directly into Google, ask for a Google API key, or store Google tokens. Sync delays and calendars excluded from Apple's account sync also affect pet alarms. Google's official [Apple Calendar setup guide](https://support.google.com/calendar/answer/99358?hl=en) covers account and calendar selection.
+1. Open Google Calendar on the web.
+2. Open **Settings**, then select your calendar under **Settings for my calendars**.
+3. Copy **Secret address in iCal format**.
+4. Paste the link in **Google or Outlook calendar link** and click **Add link**.
 
-## Keep your pet on duty
+### Outlook link
 
-Keep LokiDot running and your Mac awake and signed in. Closing the playground leaves the app running in the paw menu. Quitting the app stops alarms. This feature does not install a background service, wake the Mac, or deliver system notifications while the app is closed.
+Use this source for Microsoft 365 work calendars. On October 1, 2026, Microsoft started to turn off Exchange Web Services (EWS) in Exchange Online. Apple Calendar uses EWS for Exchange accounts. Thus a work Outlook calendar can stop syncing to Apple Calendar.
 
-Alarms are hidden while the screen sleeps or the user session is inactive. On return, reminders missed by up to two minutes can appear if the event has not ended; older reminders are skipped. Snoozed reminders also stop when their event ends. Calendar events refresh when the local store changes and at least once a minute while active. The look-ahead window is 24 hours.
+1. Open Outlook on the web.
+2. Open **Settings → Calendar → Shared calendars**.
+3. Under **Publish a calendar**, select your calendar and **Can view all details**. Click **Publish**.
+4. Copy the **ICS** link.
+5. Paste the link in **Google or Outlook calendar link** and click **Add link**.
 
-## Your events stay local
+Some organizations do not allow calendar publishing. In that case, ask your administrator, or add the account to Apple Calendar if your organization permits it.
 
-Event titles are hidden in alerts by default. Enable **Show event titles in alerts** if you want them visible on your screen. Titles and event snapshots stay in memory; local preferences retain selected calendar identifiers and opaque delivery keys/times so restarts do not repeat an alarm. Recent delivery history expires after the event ends plus one day. Snoozes survive restarts while their event remains available. Calendar data is never sent to GitHub or another service by LokiDot.
+LokiDot reads each link every 10 minutes, when the Mac wakes, and when you click **Refresh**. If a read fails, LokiDot keeps the last good events. The settings window shows the time of the last read and any error.
 
-Turn off **Let my pets remind me** to stop reading events in the background. Revoke access in System Settings to disconnect the app completely. Calendar alarms use their own lead time, rather than copying each event's existing Apple or Google notification settings.
+**CAUTION:** A calendar link gives read access to your calendar. Do not share the link. LokiDot keeps the link only in its preferences on this Mac and sends it only to the calendar server.
 
-Implementation follows Apple's [EventKit access guidance](https://developer.apple.com/documentation/eventkit/accessing-calendar-using-eventkit-and-eventkitui) and [macOS 14 permission changes](https://developer.apple.com/documentation/technotes/tn3153-adopting-api-changes-for-eventkit-in-ios-macos-and-watchos).
+If the same meeting comes from two sources, LokiDot shows one reminder. It keeps the copy that has a join link.
+
+## Reminder behavior
+
+- **First reminder**: at the start, or 1, 2, 5, 10 or 15 minutes before. The default is 5 minutes.
+- **Remind me again when it starts**: on by default. You get a second card at the start time.
+- The card has **Join** (when the meeting has a link), **Remind me at start** (or **Snooze 1 min** near the start) and **Dismiss**.
+- The card does not take keyboard focus. A key that you type in another app cannot join or dismiss a meeting.
+- **Join** opens links for Zoom, Google Meet, Microsoft Teams, Webex, Amazon Chime, Whereby, Jitsi Meet, Slack huddles, FaceTime, GoTo Meeting and BlueJeans. LokiDot finds the link in the event's conference data, URL, location or notes. It also opens links that Outlook Safe Links or Google redirects wrap.
+- The paw menu lists the next meetings in the next 12 hours, each with **Join**.
+- LokiDot skips all-day events, cancelled events and invitations that you declined.
+
+### Sleep and missed reminders
+
+LokiDot cannot remind you while the Mac sleeps. When the Mac wakes:
+
+- If a first reminder was missed and the meeting has not started, the card shows.
+- If the meeting started less than 10 minutes ago, the card shows once.
+- Older reminders do not show.
+
+### Privacy
+
+Meeting titles show on the card and in the menu bar by default. Before you share your screen, turn off **Show meeting titles**. The card then shows "Your next meeting".
+
+Event titles and event data stay in memory. LokiDot saves only the selected calendar identifiers, the calendar links, and opaque reminder keys with times. It saves reminder keys so that a restart does not repeat a reminder. Old keys expire one day after their event ends. LokiDot sends no calendar data to GitHub or to other services.
+
+## Recurring events in links
+
+LokiDot expands recurring events from calendar links on your Mac. It supports `DAILY`, `WEEKLY`, `MONTHLY` and `YEARLY` rules with `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTHDAY`, `BYMONTH` and `WKST`. It also supports `EXDATE`, `RDATE`, moved or cancelled single occurrences (`RECURRENCE-ID`), and Windows time zone names from Outlook.
+
+LokiDot does not support `BYSETPOS`, `BYHOUR` and other rare rule parts. It shows such an event once, at its first start. Apple Calendar sources do not have this limit, because macOS expands their rules.
+
+## Resource use
+
+Between reminders, LokiDot has no window on screen and runs no animation. It keeps no dog artwork in memory. One timer waits for the next reminder, and there is no polling every second. Apple Calendar changes arrive as system notifications.

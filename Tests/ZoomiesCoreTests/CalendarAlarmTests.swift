@@ -15,9 +15,10 @@ final class CalendarAlarmTests: XCTestCase {
                            isAllDay: allDay, isCancelled: cancelled, isDeclined: declined)
     }
 
-    func testDefaultsArePrivateAndOptIn() {
+    func testDefaultsAreOptInWithHeadsUpAndStartReminders() {
         let value = CalendarAlarmSettings()
-        XCTAssertFalse(value.enabled); XCTAssertTrue(value.calendarIDs.isEmpty); XCTAssertFalse(value.showEventTitles)
+        XCTAssertFalse(value.enabled); XCTAssertTrue(value.calendarIDs.isEmpty); XCTAssertTrue(value.showEventTitles)
+        XCTAssertEqual(value.leadMinutes, 5); XCTAssertTrue(value.alsoAtStart); XCTAssertTrue(value.feeds.isEmpty)
         var scheduler = CalendarAlarmScheduler()
         XCTAssertTrue(scheduler.due(events: [event()], settings: value, now: now).isEmpty)
     }
@@ -45,9 +46,82 @@ final class CalendarAlarmTests: XCTestCase {
         XCTAssertTrue(scheduler.receipts.isEmpty)
     }
 
-    func testWakeCatchesUpOnlyRecentAlarms() {
+    func testWakeShowsMissedHeadsUpBeforeStartAndStartOnlyBrieflyAfter() {
         var scheduler = CalendarAlarmScheduler()
-        XCTAssertEqual(scheduler.due(events: [event("recent", start: 180), event("old", start: 179)], settings: settings, now: now).map(\.id), ["recent"])
+        // Heads-up missed by minutes, meeting not started yet: still useful.
+        XCTAssertEqual(scheduler.due(events: [event("soon", start: 60)], settings: settings, now: now).map(\.id), ["soon"])
+        // Started 9 minutes ago with nothing shown: one start reminder.
+        XCTAssertEqual(scheduler.due(events: [event("late", start: -540)], settings: settings, now: now).map(\.id), ["late"])
+        XCTAssertTrue(scheduler.due(events: [event("late", start: -540)], settings: settings, now: now.addingTimeInterval(1)).isEmpty)
+        // Started 11 minutes ago: too late, and never shown later either.
+        XCTAssertTrue(scheduler.due(events: [event("stale", start: -660)], settings: settings, now: now).isEmpty)
+        XCTAssertNil(scheduler.nextFireDate(events: [event("stale", start: -660)], settings: settings, now: now.addingTimeInterval(1)))
+    }
+
+    func testHeadsUpThenStartReminderEachFireOnce() {
+        var scheduler = CalendarAlarmScheduler()
+        XCTAssertEqual(scheduler.due(events: [event()], settings: settings, now: now), [event()])
+        XCTAssertEqual(scheduler.nextFireDate(events: [event()], settings: settings, now: now.addingTimeInterval(1)), now.addingTimeInterval(300))
+        XCTAssertTrue(scheduler.due(events: [event()], settings: settings, now: now.addingTimeInterval(299)).isEmpty)
+        XCTAssertEqual(scheduler.due(events: [event()], settings: settings, now: now.addingTimeInterval(300)), [event()])
+        XCTAssertTrue(scheduler.due(events: [event()], settings: settings, now: now.addingTimeInterval(301)).isEmpty)
+        XCTAssertNil(scheduler.nextFireDate(events: [event()], settings: settings, now: now.addingTimeInterval(301)))
+    }
+
+    func testStartReminderCanBeTurnedOff() {
+        var scheduler = CalendarAlarmScheduler(), single = settings
+        single.alsoAtStart = false
+        XCTAssertEqual(scheduler.due(events: [event()], settings: single, now: now), [event()])
+        XCTAssertTrue(scheduler.due(events: [event()], settings: single, now: now.addingTimeInterval(300)).isEmpty)
+    }
+
+    func testNextFireDateIsTheEarliestOwedReminderOnly() {
+        let scheduler = CalendarAlarmScheduler()
+        let events = [event("b", start: 1200, end: 4800), event("a", start: 600, end: 4200), event("x", calendar: "other", start: 400)]
+        XCTAssertEqual(scheduler.nextFireDate(events: events, settings: settings, now: now), now.addingTimeInterval(300))
+        var off = settings; off.enabled = false
+        XCTAssertNil(scheduler.nextFireDate(events: events, settings: off, now: now))
+    }
+
+    func testSnoozeGoesToStartOrOneMinute() {
+        XCTAssertEqual(CalendarAlarmScheduler.snoozeTarget(for: event(), now: now), now.addingTimeInterval(300))
+        XCTAssertEqual(CalendarAlarmScheduler.snoozeTarget(for: event(), now: now.addingTimeInterval(270)), now.addingTimeInterval(330))
+    }
+
+    func testOlderSavedSettingsKeepValuesAndGainNewDefaults() throws {
+        let old = #"{"enabled":true,"calendarIDs":["a"],"leadMinutes":10,"sound":false,"showEventTitles":false}"#
+        let value = try JSONDecoder().decode(CalendarAlarmSettings.self, from: Data(old.utf8))
+        XCTAssertTrue(value.enabled); XCTAssertEqual(value.calendarIDs, ["a"]); XCTAssertEqual(value.leadMinutes, 10)
+        XCTAssertFalse(value.sound); XCTAssertFalse(value.showEventTitles); XCTAssertTrue(value.alsoAtStart); XCTAssertTrue(value.feeds.isEmpty)
+        let receipt = try JSONDecoder().decode(CalendarAlarmReceipt.self, from: Data(#"{"key":"k","expires":0}"#.utf8))
+        XCTAssertNil(receipt.startDelivered)
+    }
+
+    func testFeedLinksAcceptHTTPSAndWebcalOnly() {
+        XCTAssertEqual(CalendarFeedConfig.normalizedURL(" webcal://outlook.office365.com/owa/calendar/a/b/calendar.ics ")?.absoluteString,
+                       "https://outlook.office365.com/owa/calendar/a/b/calendar.ics")
+        XCTAssertNotNil(CalendarFeedConfig.normalizedURL("https://calendar.google.com/calendar/ical/a%40b.com/private-x/basic.ics"))
+        for bad in ["http://example.com/a.ics", "file:///etc/passwd", "https://user:pw@example.com/a.ics", "https://", "", "https://a b.com/x"] {
+            XCTAssertNil(CalendarFeedConfig.normalizedURL(bad), bad)
+        }
+        let google = URL(string: "https://calendar.google.com/calendar/ical/ash%40example.com/private-secret/basic.ics")!
+        XCTAssertEqual(CalendarFeedConfig.suggestedName(for: google), "Google · ash@example.com")
+        XCTAssertFalse(CalendarFeedConfig.suggestedName(for: google).contains("secret"))
+        XCTAssertEqual(CalendarFeedConfig.suggestedName(for: URL(string: "https://outlook.office365.com/owa/calendar/x/y/calendar.ics")!), "Outlook calendar")
+    }
+
+    func testFeedEventsCarryJoinLinksAndDuplicatesCollapse() {
+        let start = now.addingTimeInterval(300)
+        let feed = FeedEvent(uid: "u1", title: "Standup", start: start, end: start.addingTimeInterval(900), occurrence: start,
+                             isAllDay: false, isCancelled: false, isDeclined: false, location: "Room 4",
+                             notes: "Join https://us02web.zoom.us/j/123?pwd=x", url: nil, conferenceURL: nil)
+        let converted = CalendarAlarmEvent.fromFeed([feed], calendarID: "feed:1")
+        XCTAssertEqual(converted.first?.joinURL?.absoluteString, "https://us02web.zoom.us/j/123?pwd=x")
+        XCTAssertEqual(converted.first?.calendarID, "feed:1")
+        let synced = CalendarAlarmEvent(id: "ek", calendarID: "google", title: "standup", start: start, end: start.addingTimeInterval(900))
+        let merged = CalendarAlarmEvent.deduplicated([synced] + converted + [event("other", start: 900, end: 1800)])
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertNotNil(merged.first?.joinURL)
     }
 
     func testRecurringOccurrencesGetSeparateAlarms() {
