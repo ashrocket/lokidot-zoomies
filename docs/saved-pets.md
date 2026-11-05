@@ -1,6 +1,6 @@
 # Your pets have a home
 
-The current Mac source build saves every imported sprite pack in a local pet library. **Add your dog…**, **Import pet…**, and `lokidot dog FOLDER` validate the pack, save their own copy, and select it. You can move the original folder afterward; keeping it as a backup is still useful.
+Mac 2.0.0 saves every imported sprite pack in a local pet library. **Add your dog…**, **Import pet…**, and `lokidot dog FOLDER` validate the pack, save their own copy, and select it. You can move the original folder afterward; keeping it as a backup is still useful.
 
 Open **Saved pets…** in the playground or paw menu, or run `lokidot pets`.
 
@@ -34,4 +34,4 @@ The previous Mac import flow remembered only one external folder. This build mig
 - **Removed:** import the original folder again, or restore the saved folder from Trash before reopening the app.
 - **Needs repair:** other saved pets still load. Keep a backup, remove the damaged managed copy through Saved pets, then import a complete pack again. Reimport does not silently overwrite damaged data.
 
-Published 1.3.2 downloads and the Windows preview retain their earlier import behavior; keep their original folders in place. Calendar and library changes are currently available in the Mac source build.
+Mac 1.3.2 and the Windows preview retain their earlier import behavior; keep their original folders in place. Calendar and library changes are in Mac 2.0.0.

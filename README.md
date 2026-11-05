@@ -122,7 +122,7 @@ Prefer to make the art yourself? Start with `lokidot new-dog FOLDER NAME`, repla
 
 ### Keep a pack, put a pet away
 
-The Mac source build has **Saved pets…** in the playground and paw menu. Imports are saved outside the app, restored on launch, and included in **The whole pack** while loaded. **Unload pet** keeps a pet saved for later. **Remove saved copy…** moves only LokiDot's copy to Trash, leaving your original folder untouched. **Put pets away** clears the desktop and stays off across launches until you choose **Let’s go!** or resume.
+Mac 2.0.0 has **Saved pets…** in the playground and paw menu. Imports are saved outside the app, restored on launch, and included in **The whole pack** while loaded. **Unload pet** keeps a pet saved for later. **Remove saved copy…** moves only LokiDot's copy to Trash, leaving your original folder untouched. **Put pets away** clears the desktop and stays off across launches until you choose **Let’s go!** or resume.
 
 ```sh
 lokidot pets       # Load, unload, or remove saved imports

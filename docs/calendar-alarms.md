@@ -2,7 +2,7 @@
 
 LokiDot Zoomies reminds you about meetings. Before a meeting, the whippet runs across your screen. A card shows the meeting title, the start time and a **Join** button. The menu bar shows the time to your next meeting.
 
-Meeting reminders are in the Mac source build 2.0.0. The published 1.3.2 installers and the Windows preview do not have them.
+Meeting reminders are in Mac 2.0.0. Mac 1.3.2 and the Windows preview do not have them.
 
 ## Set up
 
