@@ -1,4 +1,5 @@
 import AppKit
+import AudioToolbox
 import EventKit
 import ServiceManagement
 import ZoomiesCore
@@ -108,13 +109,13 @@ final class CalendarAlarmController: NSObject {
         feedTimer?.invalidate(); feedTimer = nil
         for task in feedTasks.values { task.cancel() }
         NotificationCenter.default.removeObserver(self)
-        alertWindow?.hide()
+        hideCard()
     }
 
     func setSessionActive(_ value: Bool) {
         sessionActive = value
         if value { refreshSystem(); refreshFeeds(); tick() }
-        else { fireTimer?.invalidate(); fireTimer = nil; alertWindow?.hide() }
+        else { fireTimer?.invalidate(); fireTimer = nil; hideCard() }
     }
 
     func showSettings() {
@@ -127,6 +128,7 @@ final class CalendarAlarmController: NSObject {
             window.onAddFeed = { [weak self] text in self?.addFeed(text) ?? "" }
             window.onRemoveFeed = { [weak self] id in self?.removeFeed(id) }
             window.onLoginItem = { [weak self] on in self?.setOpenAtLogin(on) }
+            window.onClose = { [weak self] in DispatchQueue.main.async { self?.settingsWindow = nil; MemoryRelief.soon() } }
             settingsWindow = window
         }
         settingsWindow?.present()
@@ -260,6 +262,7 @@ final class CalendarAlarmController: NSObject {
 
     private func finishFetch(_ id: String, _ result: Result<[CalendarAlarmEvent], Error>) {
         feedTasks[id] = nil
+        MemoryRelief.soon()
         guard settings.feeds.contains(where: { $0.id == id }) else { return }
         switch result {
         case .success(let events):
@@ -306,7 +309,7 @@ final class CalendarAlarmController: NSObject {
         settings = value
         if !canEnable { settings.enabled = false }
         persist()
-        queue.removeAll(); active = nil; alertWindow?.hide()
+        queue.removeAll(); active = nil; hideCard()
         scheduleFeedTimer()
         refreshSystem()
         if settings.enabled && (!wasEnabled || feedEvents.count < settings.feeds.count) { refreshFeeds() }
@@ -322,7 +325,7 @@ final class CalendarAlarmController: NSObject {
         queue = queue.compactMap { queued in valid.first { $0.key == queued.key } }
         if let current = active {
             active = valid.first { $0.key == current.key }
-            if active == nil { alertWindow?.hide(); showNext() }
+            if active == nil { hideCard(); showNext() }
         }
         onUpcomingChanged?()
         updateWindow()
@@ -332,7 +335,7 @@ final class CalendarAlarmController: NSObject {
     private func tick() {
         fireTimer?.invalidate(); fireTimer = nil
         guard settings.enabled else {
-            if active != nil || !queue.isEmpty { active = nil; queue = []; alertWindow?.hide() }
+            if active != nil || !queue.isEmpty { active = nil; queue = []; hideCard() }
             return
         }
         // While the screen sleeps, keep the card and queue; show them on wake.
@@ -344,7 +347,7 @@ final class CalendarAlarmController: NSObject {
             else if !queue.contains(where: { $0.key == event.key }) { queue.append(event) }
         }
         if scheduler.receipts != before { persist() }
-        if let current = active, current.end <= now { active = nil; alertWindow?.hide() }
+        if let current = active, current.end <= now { active = nil; hideCard() }
         showNext()
         // Sleep until the next owed reminder or the end of the card on screen.
         var wake = scheduler.nextFireDate(events: events, settings: settings, now: now)
@@ -395,12 +398,32 @@ final class CalendarAlarmController: NSObject {
         alertWindow?.onSnooze = snooze
         alertWindow?.onJoin = join
         alertWindow?.present(title: title, detail: detail, joinTitle: joinTitle, snoozeTitle: snoozeTitle)
-        if sound && settings.sound { NSSound(named: NSSound.Name("Glass"))?.play() }
+        if sound && settings.sound { Self.playAlertSound() }
         if sound { onPetAlert?() }
     }
 
+    /// The system sound server plays the sound. NSSound would load Core Audio
+    /// into this process and keep about 2.7 MB after one reminder.
+    private static func playAlertSound() {
+        var id: SystemSoundID = 0
+        let url = URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff") as CFURL
+        guard AudioServicesCreateSystemSoundID(url, &id) == noErr else { NSSound.beep(); return }
+        let soundID = id
+        AudioServicesPlaySystemSoundWithCompletion(soundID) { AudioServicesDisposeSystemSoundID(soundID) }
+    }
+
     private func dismiss() {
-        active = nil; alertWindow?.hide(); showNext(); tick()
+        active = nil; hideCard(); showNext(); tick()
+    }
+
+    /// Hides the card. When no reminder needs it, the card is released after
+    /// its button action returns, and a new one is built for the next reminder.
+    private func hideCard() {
+        alertWindow?.hide()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.active == nil, self.alertWindow != nil, self.alertWindow?.window?.isVisible != true else { return }
+            self.alertWindow = nil; MemoryRelief.soon()
+        }
     }
 
     func testAlarm() {

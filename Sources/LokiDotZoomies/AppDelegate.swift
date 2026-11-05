@@ -171,8 +171,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
     }
 
     private func teardownOverlay() {
+        let hadOverlay = overlay != nil
         overlay?.settle(); overlay?.window.close(); overlay = nil
         artworkCache.removeAll()
+        if hadOverlay { MemoryRelief.soon() }
     }
 
     /// Rebuilds the overlay for the current pets and display. With `play` the
@@ -560,6 +562,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             controller.onCalendars = { [weak self] in self?.showCalendarAlarms() }
             controller.onSavedPets = { [weak self] in self?.showSavedPets() }
             controller.onUnload = { [weak self] in self?.unloadPets() }
+            controller.onClose = { [weak self] in DispatchQueue.main.async { self?.playground = nil; MemoryRelief.soon() } }
             playground = controller
         }
         playground?.present()
@@ -806,6 +809,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CAAnim
             window.onLoad = { [weak self] id in self?.loadSavedPet(id) }
             window.onUnload = { [weak self] id in self?.unloadSavedPet(id) }
             window.onRemove = { [weak self] id in self?.removeSavedPet(id) }
+            window.onClose = { [weak self] in DispatchQueue.main.async { self?.savedPetsWindow = nil; MemoryRelief.soon() } }
             savedPetsWindow = window
         }
         do { try reloadSavedPets() } catch { showArtworkError(error, title: "Saved pets could not be opened") }

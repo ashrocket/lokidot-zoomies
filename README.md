@@ -13,7 +13,7 @@ Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets 
 
 **Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
 
-**Source build 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory. At idle it has an 11 MB footprint (1.3.2: 67 MB) and no overlay window. The whippet appears only when a reminder fires or when you ask for zoomies. The published installers are still 1.3.2. See [Meeting reminders](docs/calendar-alarms.md).
+**Source build 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory and almost no CPU. After launch it uses 10.9 MB of memory (1.3.2: 67 MB) and has no overlay window. After you use the menu, a reminder and the settings window, it stays at 20–25 MB, mostly macOS caches. At idle it uses less than 0.1% of one CPU core. These values are without Apple Calendar connected. See [Resource use](docs/calendar-alarms.md#resource-use) for the conditions and how to check the values yourself. The whippet appears only when a reminder fires or when you ask for zoomies. The published installers are still 1.3.2. See [Meeting reminders](docs/calendar-alarms.md).
 
 [Watch Loki Vampire’s Halloween zoomies with an original spooky score](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/Halloween-Zoomies-spooky.mp4).
 

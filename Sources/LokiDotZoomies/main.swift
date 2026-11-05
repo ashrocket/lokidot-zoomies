@@ -45,7 +45,8 @@ if let index = args.firstIndex(of: "--render-motion-preview") {
 } else {
     MainActor.assumeIsolated {
         let application = NSApplication.shared
-        application.setActivationPolicy(.regular)
+        // LSUIElement in Info.plist makes a menu-bar-only app; otherwise show the Dock icon.
+        if Bundle.main.object(forInfoDictionaryKey: "LSUIElement") as? Bool != true { application.setActivationPolicy(.regular) }
         let delegate = AppDelegate()
         application.delegate = delegate
         withExtendedLifetime(delegate) { application.run() }

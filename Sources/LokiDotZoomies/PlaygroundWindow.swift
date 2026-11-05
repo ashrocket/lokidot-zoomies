@@ -2,7 +2,9 @@ import AppKit
 import ZoomiesCore
 
 @MainActor
-final class PlaygroundWindow: NSWindowController {
+final class PlaygroundWindow: NSWindowController, NSWindowDelegate {
+    var onClose: (() -> Void)?
+    func windowWillClose(_ notification: Notification) { onClose?() }
     var onPlay: ((String, MotionStyle) -> Void)?
     var onPause: (() -> Void)?
     var onImport: (() -> Void)?
@@ -26,7 +28,7 @@ final class PlaygroundWindow: NSWindowController {
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "LokiDot Zoomies"
         window.isReleasedWhenClosed = false
-        super.init(window: window)
+        super.init(window: window); window.delegate = self
         let root = NSStackView()
         root.orientation = .vertical; root.alignment = .leading; root.spacing = 14
         root.translatesAutoresizingMaskIntoConstraints = false

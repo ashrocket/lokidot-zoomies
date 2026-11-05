@@ -2,7 +2,9 @@ import AppKit
 import ZoomiesCore
 
 @MainActor
-final class SavedPetsWindow: NSWindowController, NSTableViewDataSource, NSTableViewDelegate {
+final class SavedPetsWindow: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
+    var onClose: (() -> Void)?
+    func windowWillClose(_ notification: Notification) { onClose?() }
     struct Row { let pet: SavedPet; let loaded: Bool }
     var onImport: (() -> Void)?
     var onLoad: ((String) -> Void)?
@@ -19,7 +21,7 @@ final class SavedPetsWindow: NSWindowController, NSTableViewDataSource, NSTableV
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 430),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Saved pets"; window.isReleasedWhenClosed = false
-        super.init(window: window)
+        super.init(window: window); window.delegate = self
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 14
         root.translatesAutoresizingMaskIntoConstraints = false
         let title = NSTextField(labelWithString: "A home for your whole pack.")

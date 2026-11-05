@@ -2,7 +2,9 @@ import AppKit
 import ZoomiesCore
 
 @MainActor
-final class CalendarAlarmWindow: NSWindowController {
+final class CalendarAlarmWindow: NSWindowController, NSWindowDelegate {
+    var onClose: (() -> Void)?
+    func windowWillClose(_ notification: Notification) { onClose?() }
     var onConnect: (() -> Void)?
     var onChange: ((CalendarAlarmSettings) -> Void)?
     var onRefresh: (() -> Void)?
@@ -30,7 +32,7 @@ final class CalendarAlarmWindow: NSWindowController {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 760),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Meeting reminders"; window.isReleasedWhenClosed = false
-        super.init(window: window)
+        super.init(window: window); window.delegate = self
         let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 10
         root.translatesAutoresizingMaskIntoConstraints = false
         let heading = NSTextField(labelWithString: "Your whippet watches the clock.")

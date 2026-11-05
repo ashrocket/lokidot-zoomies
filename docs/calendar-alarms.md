@@ -88,4 +88,49 @@ LokiDot does not support `BYSETPOS`, `BYHOUR` and other rare rule parts. It show
 
 ## Resource use
 
-Between reminders, LokiDot has no window on screen and runs no animation. It keeps no dog artwork in memory. One timer waits for the next reminder, and there is no polling every second. Apple Calendar changes arrive as system notifications.
+Between reminders, LokiDot has no window on screen and runs no animation. It keeps no dog artwork in memory. One timer waits for the next reminder, and there is no polling every second. Apple Calendar changes arrive as system notifications. The reminder sound plays through the macOS sound service, so Core Audio does not stay in LokiDot's memory.
+
+### Measured values
+
+These values are for build 2.0.0 on a MacBook Pro with an M1 chip and 8 GB of memory, macOS 26.7.2, measured on November 3, 2026. CPU time, wakeups and energy come from the kernel's counters for the process (`proc_pid_rusage`). Memory is the value in the **Memory** column of Activity Monitor (the physical footprint).
+
+CPU during 10 minutes of idle:
+
+| Condition | CPU time | Share of one core | Processor wakeups | Energy |
+| --- | --- | --- | --- | --- |
+| Reminders off, nothing opened since launch | 0.011 s | 0.002% | 8 | less than 0.001 J |
+| Reminders on, one calendar link, a meeting less than one hour away | 0.39 s | 0.065% | 92 | 0.03 J |
+
+The reminders-on period includes the calendar link reads in that period (one read each 10 minutes) and a menu-bar countdown that changes each minute. In the same two periods, the Dock used 1.74 s and 0.12 s of CPU, and SystemUIServer used 0.009 s and 0.020 s. When no meeting is less than one hour away, the countdown does not run.
+
+Memory:
+
+| State | Memory |
+| --- | --- |
+| Fresh launch, idle | 10.9 MB |
+| After the paw menu opens one time | 15.6 MB |
+| After a reminder card with sound and a lap | 19.9 MB |
+| While the settings window is open | 26.9 MB |
+| After the settings window closes | 25.0 MB |
+| Highest value during the test (during a lap) | 32.4 MB |
+
+Each step in this table includes the steps above it. LokiDot releases each window, card and lap when it closes, and gives the free memory back to macOS. Most of the increase after use is caches that macOS keeps in the process for menus, buttons and text. When the Mac needs memory, macOS can remove some of these caches. On the same Mac, a test app with only a menu-bar icon uses 9.0 MB.
+
+These values do not include Apple Calendar. When you connect Apple Calendar, macOS loads EventKit into LokiDot, and memory increases. LokiDot also reads the calendar again each time macOS syncs it. We did not measure CPU or memory with Apple Calendar connected.
+
+[Version 2.0.0 verification](VERIFICATION-2.0.0.md) tells how these values were measured, and where the raw logs are.
+
+### Check it yourself
+
+1. Open Activity Monitor and find **LokiDotZoomies**.
+2. On the **Memory** tab, read the **Memory** column.
+3. On the **CPU** tab, read **CPU Time** and **Idle Wake Ups**. Wait 10 minutes, then read them again.
+4. On the **Energy** tab, read **Energy Impact**.
+
+In Terminal, this command shows one sample each minute for 10 minutes:
+
+```sh
+top -l 11 -s 60 -stats pid,command,cpu,time,idlew,power,mem -pid $(pgrep -x LokiDotZoomies)
+```
+
+`TIME` is the total CPU time since launch. At idle with reminders off, it changes by less than 0.02 s in 10 minutes.
