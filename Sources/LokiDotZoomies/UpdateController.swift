@@ -74,7 +74,7 @@ final class UpdateController: NSObject {
     }
 
     private func didCheck(_ result: Result<UpdateTransport.Output, Error>, manual: Bool) {
-        busy = false; transport = nil; refreshMenu()
+        busy = false; transport = nil; refreshMenu(); MemoryRelief.soon()
         guard manual || defaults.bool(forKey: automaticKey) else { return }
         do {
             guard case .metadata(let data) = try result.get() else { throw UpdateError("The release response is invalid.") }

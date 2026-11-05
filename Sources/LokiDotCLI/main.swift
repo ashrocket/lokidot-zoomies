@@ -12,6 +12,10 @@ LokiDot Zoomies — a little pack of desktop companions
   lokidot prance [all|robot-loki|beagle|whippet]
   lokidot dog FOLDER [zoomies|circle|prance]
   lokidot pause | resume | quit | status
+  lokidot calendars             Meeting reminders: Apple Calendar, Google or Outlook links
+  lokidot alarm-test            Try a reminder card without calendar access
+  lokidot pets                  Manage saved imported pets
+  lokidot unload                Put all pets away; keep them saved
   lokidot validate FOLDER        Check your dog's sprite pack
   lokidot new-dog FOLDER [NAME]   Make a starter pack you can draw over
   lokidot dog-prompt             Print a setup prompt for your agent
@@ -91,6 +95,9 @@ do {
     }
     let request: LaunchRequest
     switch command {
+    case "calendars", "alarm-test", "pets", "unload":
+        guard args.count == 1 else { throw SpritePackError("Usage: lokidot \(command)") }
+        request = try LaunchRequest(action: LaunchRequest.Action(rawValue: command)!)
     case "show", "start", "play":
         guard args.count <= 2 else { throw SpritePackError("Usage: lokidot \(command) [zoomies|circle|prance]") }
         request = try LaunchRequest(action: command == "show" ? .show : .play,
@@ -130,7 +137,7 @@ do {
     }
     guard olderCopies.allSatisfy(\.isTerminated) else { throw SpritePackError("The older LokiDot is still closing; it has not been force-stopped.") }
     let configuration = NSWorkspace.OpenConfiguration()
-    configuration.activates = request.action == .show
+    configuration.activates = request.action == .show || request.action == .calendars || request.action == .pets
     configuration.arguments = ["--background"]
     var completed = false
     var launchError: Error?

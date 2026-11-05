@@ -7,8 +7,8 @@
     <key>CFBundleExecutable</key><string>LokiDotZoomies</string>
     <key>CFBundleIconFile</key><string>AppIcon.icns</string>
     <key>CFBundleIdentifier</key><string>com.ashrocket.LokiDotZoomies</string>
-    <key>CFBundleVersion</key><string>4</string>
-    <key>CFBundleShortVersionString</key><string>1.3.2</string>
+    <key>CFBundleVersion</key><string>5</string>
+    <key>CFBundleShortVersionString</key><string>2.0.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><false/>
@@ -20,6 +20,8 @@
     </dict></array>
     <key>NSSupportsAutomaticTermination</key><false/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSCalendarsUsageDescription</key><string>LokiDot reads selected calendars so your pets can remind you about upcoming events. It never creates, edits, or deletes calendar events.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>LokiDot reads selected Apple and synced Google calendars for pet alarms. macOS requires full calendar access to read events; LokiDot never creates, edits, or deletes them.</string>
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 LokiDot Zoomies contributors. MIT License.</string>
 </dict>

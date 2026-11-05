@@ -1,17 +1,19 @@
 # LokiDot Zoomies 🐾
 
-**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi)**
+**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/LokiDot-Zoomies-win-x64.msi)**
 
 | Installer | Requirements | Version |
 | --- | --- | --- |
-| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg) | Apple silicon, macOS 13+ | 1.3.2 |
-| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 1.3.2 preview |
+| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg) | Apple silicon, macOS 13+ | 2.0.0 |
+| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 1.3.2 preview (no 2.0.0 build yet) |
 
 [Release notes, portable ZIPs, and SHA-256 checksums](https://github.com/ashrocket/lokidot-zoomies/releases/latest). Both installers are unsigned; the Mac app is locally signed but not notarized. Review your operating system's security prompts. The Windows preview passed automated installer and app checks; interactive desktop testing is still pending. [Windows details](windows/README.md).
 
 Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
 
-**Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
+**Version 1.3.2 (Windows preview, and Mac before 2.0.0):** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
+
+**Version 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory and almost no CPU. After launch it uses 10.9 MB of memory (1.3.2: 67 MB) and has no overlay window. After you use the menu, a reminder and the settings window, it stays at 20–25 MB, mostly macOS caches. At idle it uses less than 0.1% of one CPU core. These values are without Apple Calendar connected. See [Resource use](docs/calendar-alarms.md#resource-use) for the conditions and how to check the values yourself. The whippet appears only when a reminder fires or when you ask for zoomies. Windows stays on the 1.3.2 preview for now. See [Meeting reminders](docs/calendar-alarms.md).
 
 [Watch Loki Vampire’s Halloween zoomies with an original spooky score](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/Halloween-Zoomies-spooky.mp4).
 
@@ -80,9 +82,22 @@ lokidot quit                # Everyone goes for a nap
 | **Little circles** | Two compact loops, a touch of depth, and soft transitions between the authored left and right poses. Dogs stay upright and visible. |
 | **Happy prance** | Six small hops, using each dog's actual jumping frames, with soft landings and a short stagger across the pack. |
 
-The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**, and **Repeat gently**. A move plays once, then rests for 24 seconds before repeating. Turn off **Repeat gently** for one take. macOS **Reduce Motion** keeps the pets still. Sleep and inactive login sessions hide and pause the overlay.
+The paw menu includes **Character**, **Moves**, **Display**, **Pause / Resume**, and **Repeat gently**. In 2.0.0, a move plays once and the dog leaves the screen. Turn on **Repeat gently** to keep the dog on the desktop and repeat the move every 24 seconds. The repeat uses more memory and power. macOS **Reduce Motion** keeps the pets still. Sleep and inactive login sessions hide and pause the overlay.
 
 The desktop overlay is transparent and click-through. Your normal work stays clickable.
+
+## Let the whippet remind you about meetings
+
+Open **Meeting reminders…** in the paw menu. Connect Apple Calendar, or paste a Google or Outlook calendar link (ICS). Before each meeting, the whippet runs across the screen and a card shows the meeting with **Join**. A second card shows at the start time. The menu bar counts down to your next meeting, and the paw menu lists the next meetings with **Join**.
+
+Use the Outlook link for Microsoft 365 work calendars. Microsoft started to turn off EWS in Exchange Online on October 1, 2026, so Apple Calendar can stop syncing those accounts.
+
+```sh
+lokidot calendars    # Open meeting reminders
+lokidot alarm-test   # Try a reminder card without calendar access
+```
+
+Turn on **Open LokiDot at login** so that reminders continue after a restart. The feature is in Mac 2.0.0, not in the Windows preview. [Setup, sources, privacy and behavior](docs/calendar-alarms.md).
 
 ## Bring your own best friend
 
@@ -91,7 +106,7 @@ The desktop overlay is transparent and click-through. Your normal work stays cli
 1. In the playground, click **Copy setup prompt**.
 2. Paste it into your agent, attach a clear full-body photo, and give your dog's name.
 3. Let the agent make the actual artwork and pack, validate it, and show you a preview.
-4. Click **Add your dog…** and choose the finished folder. Keep that folder somewhere permanent.
+4. Click **Add your dog…** and choose the finished folder. Mac 2.0.0 saves a local copy; keep the original as a backup. The Windows preview still needs the original folder in place.
 
 The copyable prompt contains the exact grid, manifest fields, validation commands, and launch steps. It tells the agent to deliver working files and an honest validation result. Use an agent with image-generation and file tools; a photo alone is not an animation pack.
 
@@ -104,6 +119,18 @@ lokidot dog-prompt | pbcopy
 Read the [step-by-step dog guide and copy the complete agent prompt](docs/your-dog.md). It includes photo advice, what the finished folder should contain, a drawing guide, and fixes for common problems.
 
 Prefer to make the art yourself? Start with `lokidot new-dog FOLDER NAME`, replace the practice sprite, and run `lokidot validate FOLDER`. Then `lokidot dog FOLDER circle` lets them out. See the [exact format and validator rules](docs/sprite-packs.md).
+
+### Keep a pack, put a pet away
+
+Mac 2.0.0 has **Saved pets…** in the playground and paw menu. Imports are saved outside the app, restored on launch, and included in **The whole pack** while loaded. **Unload pet** keeps a pet saved for later. **Remove saved copy…** moves only LokiDot's copy to Trash, leaving your original folder untouched. **Put pets away** clears the desktop and stays off across launches until you choose **Let’s go!** or resume.
+
+```sh
+lokidot pets       # Load, unload, or remove saved imports
+lokidot unload     # Put all pets away without deleting them
+lokidot resume     # Bring the current selection back
+```
+
+[Saved-pet storage, duplicate imports, and recovery](docs/saved-pets.md). This feature is in Mac 2.0.0, not in the Windows preview yet.
 
 The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. Loki, Beagle, and Whippet have them; Loki Vampire currently runs and circles. Choose an individual pet-v2 dog to prance, since the whole pack now includes the vampire.
 

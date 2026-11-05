@@ -36,6 +36,7 @@ xcrun swiftc -O -module-cache-path "$CLANG_MODULE_CACHE_PATH" -target "$TARGET" 
 cp "$NATIVE/SpritePackTool" "$APP/Contents/MacOS/SpritePackTool"
 cp scripts/install.sh "$APP/Contents/Resources/install.sh"
 cp Resources/DogSetupPrompt.txt "$APP/Contents/Resources/DogSetupPrompt.txt"
+cp Resources/MenuBarWhippet.png "$APP/Contents/Resources/MenuBarWhippet.png"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Generate every standard and Retina icon size from the original artwork.
 ICONSET="$STAGING/AppIcon.iconset"

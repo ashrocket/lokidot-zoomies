@@ -9,9 +9,9 @@ if args.contains("--all-ready") && args.contains("--pack") {
 if args.contains("--spritesheet") {
     fail("--spritesheet has been replaced by --pack /path/to/folder. Add manifest.json; see docs/sprite-packs.md.")
 }
-for flag in ["--pack", "--render-preview", "--render-motion-preview", "--diagnostics", "--motion"] {
+for flag in ["--pack", "--render-preview", "--render-motion-preview", "--diagnostics", "--motion", "--feed-file", "--feed-url"] {
     if let index = args.firstIndex(of: flag), args.count <= index + 1 || args[index + 1].hasPrefix("--") {
-        fail("\(flag) requires a local path.")
+        fail("\(flag) requires a value.")
     }
 }
 if let index = args.firstIndex(of: "--motion"), MotionStyle(rawValue: args[index + 1]) == nil {
@@ -38,14 +38,15 @@ if let index = args.firstIndex(of: "--render-motion-preview") {
 } else if let index = args.firstIndex(of: "--render-preview") {
     do {
         guard let url = SpriteArtwork.initialURL() else { throw SpritePackError("Supply --pack /path/to/folder or build with a validated sprite pack.") }
-        let artwork = try SpriteArtwork(url: url)
+        let artwork = try SpriteArtwork(url: url, full: true)
         try artwork.writePreviews(to: URL(fileURLWithPath: args[index + 1], isDirectory: true))
         print("Exported \(artwork.pack.frames.count) declared states for \(artwork.name).")
     } catch { fail(error.localizedDescription) }
 } else {
     MainActor.assumeIsolated {
         let application = NSApplication.shared
-        application.setActivationPolicy(.regular)
+        // LSUIElement in Info.plist makes a menu-bar-only app; otherwise show the Dock icon.
+        if Bundle.main.object(forInfoDictionaryKey: "LSUIElement") as? Bool != true { application.setActivationPolicy(.regular) }
         let delegate = AppDelegate()
         application.delegate = delegate
         withExtendedLifetime(delegate) { application.run() }

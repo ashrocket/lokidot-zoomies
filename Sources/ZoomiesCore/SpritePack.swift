@@ -177,7 +177,12 @@ public final class SpritePack {
     public let imageData: Data
     public let frames: [String: [CGImage]]
 
-    public static func load(directory: URL) throws -> SpritePack {
+    /// `trusted` skips byte-level and per-pixel checks for packs that the build
+    /// already validated (the bundled characters). `frameLimits` keeps only the
+    /// named states, at most that many frames each; nil keeps every state.
+    /// `keepImageData` retains the PNG bytes, needed only to copy or save a pack.
+    public static func load(directory: URL, trusted: Bool = false, frameLimits: [String: Int]? = nil,
+                            keepImageData: Bool = true) throws -> SpritePack {
         let root = directory.standardizedFileURL
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
@@ -190,7 +195,25 @@ public final class SpritePack {
         let manifest = try SpritePackManifest.decode(read(fd: fd, name: "manifest.json", maximum: 32_768))
         try SpritePackManifest.validateImageName(manifest.image)
         let data = try read(fd: fd, name: manifest.image, maximum: 16 * 1024 * 1024)
-        return try SpritePack(manifest: manifest, imageData: data)
+        return try SpritePack(manifest: manifest, imageData: data, trusted: trusted,
+                              frameLimits: frameLimits, keepImageData: keepImageData)
+    }
+
+    /// Reads and validates only manifest.json, and checks that its PNG is a
+    /// bounded regular file. Nothing is decoded, so listing packs stays cheap.
+    public static func readManifest(directory: URL) throws -> SpritePackManifest {
+        let root = directory.standardizedFileURL
+        let fd = open(root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard fd >= 0 else { throw SpritePackError("The pack folder could not be opened.") }
+        defer { close(fd) }
+        let manifest = try SpritePackManifest.decode(read(fd: fd, name: "manifest.json", maximum: 32_768))
+        try SpritePackManifest.validateImageName(manifest.image)
+        var info = stat()
+        guard fstatat(fd, manifest.image, &info, AT_SYMLINK_NOFOLLOW) == 0, info.st_mode & S_IFMT == S_IFREG,
+              info.st_size > 0, info.st_size <= 16 * 1024 * 1024 else {
+            throw SpritePackError("\(manifest.image): missing, a symbolic link, or larger than 16 MiB.")
+        }
+        return manifest
     }
 
     private static func read(fd: Int32, name: String, maximum: Int) throws -> Data {
@@ -206,9 +229,10 @@ public final class SpritePack {
         return data
     }
 
-    public init(manifest: SpritePackManifest, imageData: Data) throws {
+    public init(manifest: SpritePackManifest, imageData: Data, trusted: Bool = false,
+                frameLimits: [String: Int]? = nil, keepImageData: Bool = true) throws {
         guard imageData.count <= 16 * 1024 * 1024 else { throw SpritePackError("PNG exceeds 16 MiB.") }
-        try Self.validatePNGContainer(imageData)
+        if !trusted { try Self.validatePNGContainer(imageData) }
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
               CGImageSourceGetType(source) as String? == UTType.png.identifier,
               CGImageSourceGetStatus(source) == .statusComplete,
@@ -224,15 +248,18 @@ public final class SpritePack {
         }
         var decoded = [String: [CGImage]]()
         for name in rects.keys.sorted() {
-            decoded[name] = try rects[name]!.enumerated().map { index, rect in
-                guard let frame = atlas.cropping(to: rect) else { throw SpritePackError("\(name) frame \(index + 1): cannot crop the declared cell.") }
-                let alpha = try Self.alphaRange(frame)
-                guard alpha.max > 0 else { throw SpritePackError("\(name) frame \(index + 1) is empty. Supply every declared pose.") }
-                guard alpha.min == 0 else { throw SpritePackError("\(name) frame \(index + 1) has no transparent background. Export transparent PNG cells.") }
+            let limit = frameLimits.map { $0[name] ?? 0 } ?? Int.max
+            guard limit > 0 else { continue }
+            decoded[name] = try rects[name]!.prefix(limit).enumerated().map { index, rect in
+                // Each kept frame gets its own small bitmap. A cropped CGImage
+                // would keep the whole decoded atlas resident.
+                let (frame, alpha) = try Self.copyFrame(atlas, rect: rect, measureAlpha: !trusted)
+                guard trusted || alpha.max > 0 else { throw SpritePackError("\(name) frame \(index + 1) is empty. Supply every declared pose.") }
+                guard trusted || alpha.min == 0 else { throw SpritePackError("\(name) frame \(index + 1) has no transparent background. Export transparent PNG cells.") }
                 return frame
             }
         }
-        if manifest.format == "pet-v2" {
+        if !trusted && manifest.format == "pet-v2" {
             let used = rects.values.flatMap { $0 }
             for row in 0..<11 {
                 for column in 0..<8 {
@@ -244,7 +271,27 @@ public final class SpritePack {
                 }
             }
         }
-        self.manifest = manifest; self.imageData = imageData; frames = decoded
+        self.manifest = manifest; self.imageData = keepImageData ? imageData : Data(); frames = decoded
+    }
+
+    private static func copyFrame(_ atlas: CGImage, rect: CGRect, measureAlpha: Bool) throws -> (CGImage, (min: UInt8, max: UInt8)) {
+        let width = Int(rect.width), height = Int(rect.height)
+        guard let cell = atlas.cropping(to: rect),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else {
+            throw SpritePackError("Cannot copy the declared cell at \(Int(rect.minX)), \(Int(rect.minY)).")
+        }
+        context.draw(cell, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var low: UInt8 = 255, high: UInt8 = 0
+        if measureAlpha, let data = context.data {
+            let bytes = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+            for offset in stride(from: 3, to: width * height * 4, by: 4) {
+                low = min(low, bytes[offset]); high = max(high, bytes[offset])
+            }
+        }
+        guard let image = context.makeImage() else { throw SpritePackError("Cannot copy a sprite frame.") }
+        return (image, (low, high))
     }
 
     private static let crcTable: [UInt32] = (0..<256).map { value in
@@ -314,6 +361,7 @@ public final class SpritePack {
 
     /// Canonical packaging copies only the validated PNG snapshot and manifest.
     public func write(to directory: URL) throws {
+        guard !imageData.isEmpty else { throw SpritePackError("This pack was loaded for display only; load it again to copy it.") }
         guard !FileManager.default.fileExists(atPath: directory.path) else {
             throw SpritePackError("Output pack folder already exists; choose a new destination.")
         }

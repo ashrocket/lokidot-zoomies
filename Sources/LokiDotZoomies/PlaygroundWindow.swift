@@ -2,15 +2,21 @@ import AppKit
 import ZoomiesCore
 
 @MainActor
-final class PlaygroundWindow: NSWindowController {
+final class PlaygroundWindow: NSWindowController, NSWindowDelegate {
+    var onClose: (() -> Void)?
+    func windowWillClose(_ notification: Notification) { onClose?() }
     var onPlay: ((String, MotionStyle) -> Void)?
     var onPause: (() -> Void)?
     var onImport: (() -> Void)?
+    var onCalendars: (() -> Void)?
+    var onSavedPets: (() -> Void)?
+    var onUnload: (() -> Void)?
     private let pets = NSPopUpButton(frame: .zero, pullsDown: false)
     private let motions = NSPopUpButton(frame: .zero, pullsDown: false)
     private let status = NSTextField(wrappingLabelWithString: "Ready for a little chaos?")
     private let pause = NSButton(title: "Pause", target: nil, action: nil)
     private let play = NSButton(title: "Let’s go!", target: nil, action: nil)
+    private let unload = NSButton(title: "Put pets away", target: nil, action: nil)
     private let note = NSTextField(wrappingLabelWithString: "")
     private let copyPrompt = NSButton(title: "Copy setup prompt", target: nil, action: nil)
     private var jumpingAvailable: [String: Bool] = [:]
@@ -18,11 +24,11 @@ final class PlaygroundWindow: NSWindowController {
     private var committedMotion: MotionStyle?
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 610),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 650),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "LokiDot Zoomies"
         window.isReleasedWhenClosed = false
-        super.init(window: window)
+        super.init(window: window); window.delegate = self
         let root = NSStackView()
         root.orientation = .vertical; root.alignment = .leading; root.spacing = 14
         root.translatesAutoresizingMaskIntoConstraints = false
@@ -41,7 +47,8 @@ final class PlaygroundWindow: NSWindowController {
         play.bezelStyle = .rounded; play.keyEquivalent = "\r"
         play.target = self; play.action = #selector(start)
         pause.bezelStyle = .rounded; pause.target = self; pause.action = #selector(togglePause)
-        let buttons = NSStackView(views: [play, pause]); buttons.spacing = 10
+        unload.bezelStyle = .rounded; unload.target = self; unload.action = #selector(unloadPets)
+        let buttons = NSStackView(views: [play, pause, unload]); buttons.spacing = 10
         root.addArrangedSubview(buttons)
         status.font = .systemFont(ofSize: 13, weight: .medium)
         root.addArrangedSubview(status)
@@ -58,9 +65,13 @@ final class PlaygroundWindow: NSWindowController {
         copyPrompt.bezelStyle = .rounded; copyPrompt.target = self; copyPrompt.action = #selector(copySetupPrompt)
         let dogButtons = NSStackView(views: [copyPrompt, bring]); dogButtons.spacing = 10
         root.addArrangedSubview(dogButtons)
-        let hint = NSTextField(wrappingLabelWithString: "When your agent says the pack is ready, choose its finished folder with Add your dog. A photo alone won’t animate. The paw menu stays handy when you close this window.")
+        let hint = NSTextField(wrappingLabelWithString: "Add your dog saves a local copy and remembers it next time. Saved pets lets you load, unload, or remove copies. A photo alone won’t animate.")
         hint.font = .systemFont(ofSize: 11); hint.textColor = .secondaryLabelColor
         root.addArrangedSubview(hint)
+        let calendars = NSButton(title: "Meeting reminders…", target: self, action: #selector(openCalendars))
+        let saved = NSButton(title: "Saved pets…", target: self, action: #selector(openSavedPets))
+        calendars.bezelStyle = .rounded; saved.bezelStyle = .rounded
+        root.addArrangedSubview(NSStackView(views: [saved, calendars]))
         window.contentView!.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor, constant: 28),
@@ -84,7 +95,7 @@ final class PlaygroundWindow: NSWindowController {
     }
 
     func update(characters: [(id: String, name: String, canPrance: Bool)], selected: String, motion: MotionStyle,
-                status: String, paused: Bool, canPlay: Bool) {
+                status: String, paused: Bool, canPlay: Bool, canPause: Bool, petsHidden: Bool) {
         // A rest/pause update must not discard a choice the user is making.
         let pendingPet = pets.selectedItem?.representedObject as? String
         let pendingMotion = motions.selectedItem?.representedObject as? String
@@ -102,7 +113,8 @@ final class PlaygroundWindow: NSWindowController {
         self.status.stringValue = status
         selectionChanged()
         pause.title = paused ? "Resume" : "Pause"
-        pause.isEnabled = canPlay; play.isEnabled = canPlay
+        pause.isEnabled = canPause; play.isEnabled = canPlay
+        unload.isEnabled = !petsHidden
     }
 
     func present() { showWindow(nil); window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
@@ -123,6 +135,9 @@ final class PlaygroundWindow: NSWindowController {
     }
     @objc private func togglePause() { onPause?() }
     @objc private func importDog() { onImport?() }
+    @objc private func openCalendars() { onCalendars?() }
+    @objc private func openSavedPets() { onSavedPets?() }
+    @objc private func unloadPets() { onUnload?() }
     @objc private func copySetupPrompt() {
         guard let url = Bundle.main.url(forResource: "DogSetupPrompt", withExtension: "txt"),
               let prompt = try? String(contentsOf: url, encoding: .utf8) else {

@@ -11,7 +11,7 @@ A **sprite pack** is a folder containing a sheet of little dog poses and a file 
 3. **Paste it into your agent and attach the photo.** Use an agent with image-generation and file tools. Tell it the dog's name and any style preference, such as a tiny illustrated version. The prompt asks it to do the work, not just give you advice.
 4. **Review your dog.** Ask the agent for the finished folder, a running preview, and a successful validator result. Check that the dog looks right and that both running directions move naturally. If you still see the teal practice character, the real artwork is not finished.
 5. **Let them out.** In LokiDot, click **Add your dog…** and choose the finished **folder**, not the photo or PNG. Or run the exact `lokidot dog "..." circle` command your agent gives you.
-6. **Keep their home.** Store the pack somewhere permanent. The app remembers that folder; if you move it later, import the new location.
+6. **Give them a home.** Mac builds with **Saved pets…** save their own copy and remember loaded pets across launches. Use Saved pets to load, unload, or remove a copy; keep your original pack as a backup. Published 1.3.2 builds and the Windows preview still need the original folder to stay in place. [How the pet library works](saved-pets.md).
 
 The first pack supports **Big zoomies** and **Little circles**. **Happy prance** needs the full pet-v2 format with jumping artwork. Bundled Loki, Beagle, and Whippet have those poses; the optional Loki Vampire character runs and circles.
 
@@ -56,7 +56,7 @@ Preview with `lokidot dog "PACK_FOLDER" circle`, then try zoomies. You can also 
 If you cannot run the Mac app, say so and give me the exact local commands; don't claim live playback was verified.
 
 5. Hand me the finished result.
-Give me the exact pack folder, manifest.json, atlas.png, a preview, and the validation result. Explain: open LokiDot Zoomies, click "Add your dog…", and choose the FOLDER containing those two files. Keep it somewhere permanent because the app remembers that location. Include a correctly quoted launch command for my exact folder.
+Give me the exact pack folder, manifest.json, atlas.png, a preview, and the validation result. Explain: open LokiDot Zoomies, click "Add your dog…", and choose the FOLDER containing those two files. Mac builds with "Saved pets…" save their own copy, remember loaded pets across launches, and let me unload or remove saved copies. Keep my original pack as a backup. Older builds and the Windows preview still need the original folder to stay in place. Include a correctly quoted launch command for my exact folder.
 Only describe the dog as ready after its actual artwork is in place and validation has passed. Do not publish my photos or pack; I will decide if I want to share them.
 ```
 
@@ -121,7 +121,7 @@ For a choreography preview, use `--render-motion-preview` and `--motion circle` 
 | The dog jitters, slides, or changes size | Align the feet and body across cells, then review the animated loop. |
 | The validator reports missing or malformed frames | Give the exact error to the agent; have it repair and rerun validation. |
 | Happy prance is unavailable | Use zoomies/circles, or commission a complete pet-v2 pack with jumping poses. |
-| A previously imported dog disappeared after moving files | Import the pack again from its new permanent folder. |
+| A previously imported dog disappeared after moving files | Older builds need the original folder. Import it from its new location. Builds with Saved pets keep their own copy; open Saved pets and load it, or reimport if the saved copy needs repair. |
 
 ## Share the joy
 

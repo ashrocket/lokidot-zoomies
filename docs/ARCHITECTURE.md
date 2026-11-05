@@ -23,7 +23,15 @@ flowchart LR
 - **SpritePack** validates a local manifest and PNG, decodes a fixed snapshot, and exposes only declared frames. Unknown fields, unsafe file types, symlinks, traversal, invalid pixels, and incomplete packs are rejected. The app does not execute manifest contents.
 - **MotionRoute** builds the broad zoomies path, measures arc length, and supplies continuous tangents. It reserves space for the whole sprite on small, offset, wide, and portrait displays.
 - **MotionRoutine** turns progress into a pose for zoomies, circles, or prancing. Poses carry position, facing blend, bank, scale, gait time, and optional jump-frame progress. Every routine closes at its start, easing to rest at both ends.
-- **LaunchRequest** is a small, strictly validated command vocabulary. Local URLs accept only show, play, pause, resume, or quit, with a supported move and one dog selection. Unknown, duplicate, conflicting, and malformed options are rejected. Paths are encoded with URLComponents, not shell interpolation.
+- **LaunchRequest** is a small, strictly validated command vocabulary. Local URLs accept show, play, pause, resume, quit, calendars, or alarm-test. Only show/play accept a supported move and one dog selection. Calendar commands cannot grant access, enable alarms, or supply event data. Unknown, duplicate, conflicting, and malformed options are rejected. Paths are encoded with URLComponents, not shell interpolation.
+
+## Calendar alarms on Mac
+
+**CalendarAlarmController** adapts EventKit's local event store into value snapshots. Apple calendars and Google calendars synced through macOS use the same reader. Access is requested only by the explicit Connect calendars button. Disabled background alarms never fetch events. The app does not write to EventKit, authenticate directly with Google, or send calendar data over the network.
+
+**CalendarAlarmScheduler** in ZoomiesCore handles selected calendars, advance notice, recurring occurrence identity, duplicate prevention, snoozes, expiration and a two-minute catch-up window. It uses absolute dates rather than wall-clock arithmetic. Tests cover the autumn DST transition, recurrence, changed lead times, cancellation, restart persistence and absent events. Delivery receipts contain opaque identifiers/times, not titles.
+
+**CalendarAlarmWindow** provides opt-in settings and a permission-free test. **PetAlarmWindow** is a nonactivating card with Dismiss and Snooze. AppDelegate starts a lap only for an unpaused resting pet; Reduce Motion still applies. Sleep and inactive sessions hide the card. A minute refresh plus EventKit change notifications keeps a 24-hour snapshot current; a lightweight timer checks due reminders while the app is running. No launch agent or OS wake request is installed.
 
 ## One app, two ways to play
 
@@ -32,6 +40,12 @@ flowchart LR
 The bundled **lokidot** executable locates its containing app even when invoked through the installed symlink. It sends a URL directly to that app through NSWorkspace, which also delivers commands to an already-running instance. It does not start a second overlay. A different build with the same bundle id is asked to quit normally before switching; a refusal is reported rather than force-killed.
 
 The command validates an imported dog before requesting playback. The app validates again before replacing its current character. A malformed or incomplete pack cannot partially change the selection. The app remembers successful choices locally.
+
+## Saved pet library on Mac
+
+**SavedPetLibrary** writes validated manifest/PNG snapshots under the app's Application Support directory. Imports commit via a private staging folder and atomic move. Canonical content hashes give imports independent IDs, deduplicate identical packs, and prevent a user manifest ID from replacing a bundled character. Listing isolates broken entries; loading and removal reject foreign IDs and symbolic-link folders. Removal delegates only a managed child to macOS Trash.
+
+AppDelegate combines bundled characters with loaded saved imports. It remembers unloaded IDs, the selected character, whole-pack selection, and whether pets are put away. A legacy remembered folder is migrated after successful validation and copying; the source folder is preserved. **SavedPetsWindow** exposes load/unload/remove. `lokidot pets` opens it; `lokidot unload` hides the overlay and stops repeat timers without removing files. Reopening the playground does not undo an unload.
 
 `status` checks the app process; its output is not a claim about which move is playing. Successful launch-command output confirms macOS accepted delivery. The app's diagnostics and visible controls establish playback state.
 
