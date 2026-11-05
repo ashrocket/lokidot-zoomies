@@ -1,19 +1,19 @@
 # LokiDot Zoomies 🐾
 
-**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi)**
+**[Download for Mac (.pkg)](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg)** · **[Download for Windows (.msi)](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/LokiDot-Zoomies-win-x64.msi)**
 
 | Installer | Requirements | Version |
 | --- | --- | --- |
-| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg) | Apple silicon, macOS 13+ | 1.3.2 |
-| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 1.3.2 preview |
+| [Mac PKG](https://github.com/ashrocket/lokidot-zoomies/releases/latest/download/LokiDot-Zoomies-macos-arm64.pkg) | Apple silicon, macOS 13+ | 2.0.0 |
+| [Windows MSI](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/LokiDot-Zoomies-win-x64.msi) | Windows 10/11, x64 | 1.3.2 preview (no 2.0.0 build yet) |
 
 [Release notes, portable ZIPs, and SHA-256 checksums](https://github.com/ashrocket/lokidot-zoomies/releases/latest). Both installers are unsigned; the Mac app is locally signed but not notarized. Review your operating system's security prompts. The Windows preview passed automated installer and app checks; interactive desktop testing is still pending. [Windows details](windows/README.md).
 
 Good dogs. Big zoomies. A native Mac app, now with a Windows preview, that lets Loki, a beagle, an illustrated whippet—or your own dog—play on your desktop.
 
-**Version 1.3.2:** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
+**Version 1.3.2 (Windows preview, and Mac before 2.0.0):** pick **Loki Vampire** from the dog menu, or add your own artwork through **Add your dog…**. The regular app includes the vampire alongside Loki, Beagle, and Whippet. It also checks for updates in the background and asks before downloading and installing them.
 
-**Source build 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory and almost no CPU. After launch it uses 10.9 MB of memory (1.3.2: 67 MB) and has no overlay window. After you use the menu, a reminder and the settings window, it stays at 20–25 MB, mostly macOS caches. At idle it uses less than 0.1% of one CPU core. These values are without Apple Calendar connected. See [Resource use](docs/calendar-alarms.md#resource-use) for the conditions and how to check the values yourself. The whippet appears only when a reminder fires or when you ask for zoomies. The published installers are still 1.3.2. See [Meeting reminders](docs/calendar-alarms.md).
+**Version 2.0.0 (Mac):** the line-drawn whippet is the default dog, and the app is a meeting reminder for Apple Calendar, Google Calendar and Outlook. It also uses much less memory and almost no CPU. After launch it uses 10.9 MB of memory (1.3.2: 67 MB) and has no overlay window. After you use the menu, a reminder and the settings window, it stays at 20–25 MB, mostly macOS caches. At idle it uses less than 0.1% of one CPU core. These values are without Apple Calendar connected. See [Resource use](docs/calendar-alarms.md#resource-use) for the conditions and how to check the values yourself. The whippet appears only when a reminder fires or when you ask for zoomies. Windows stays on the 1.3.2 preview for now. See [Meeting reminders](docs/calendar-alarms.md).
 
 [Watch Loki Vampire’s Halloween zoomies with an original spooky score](https://github.com/ashrocket/lokidot-zoomies/releases/download/v1.3.2/Halloween-Zoomies-spooky.mp4).
 
@@ -97,7 +97,7 @@ lokidot calendars    # Open meeting reminders
 lokidot alarm-test   # Try a reminder card without calendar access
 ```
 
-Turn on **Open LokiDot at login** so that reminders continue after a restart. The feature is in the Mac source build 2.0.0, not in the published 1.3.2 installers or the Windows preview. [Setup, sources, privacy and behavior](docs/calendar-alarms.md).
+Turn on **Open LokiDot at login** so that reminders continue after a restart. The feature is in Mac 2.0.0, not in the Windows preview. [Setup, sources, privacy and behavior](docs/calendar-alarms.md).
 
 ## Bring your own best friend
 
@@ -106,7 +106,7 @@ Turn on **Open LokiDot at login** so that reminders continue after a restart. Th
 1. In the playground, click **Copy setup prompt**.
 2. Paste it into your agent, attach a clear full-body photo, and give your dog's name.
 3. Let the agent make the actual artwork and pack, validate it, and show you a preview.
-4. Click **Add your dog…** and choose the finished folder. The Mac source build saves a local copy; keep the original as a backup. Published 1.3.2 builds and the Windows preview still need the original folder in place.
+4. Click **Add your dog…** and choose the finished folder. Mac 2.0.0 saves a local copy; keep the original as a backup. The Windows preview still needs the original folder in place.
 
 The copyable prompt contains the exact grid, manifest fields, validation commands, and launch steps. It tells the agent to deliver working files and an honest validation result. Use an agent with image-generation and file tools; a photo alone is not an animation pack.
 
@@ -130,7 +130,7 @@ lokidot unload     # Put all pets away without deleting them
 lokidot resume     # Bring the current selection back
 ```
 
-[Saved-pet storage, duplicate imports, and recovery](docs/saved-pets.md). This feature is not in the published 1.3.2 downloads or Windows preview yet.
+[Saved-pet storage, duplicate imports, and recovery](docs/saved-pets.md). This feature is in Mac 2.0.0, not in the Windows preview yet.
 
 The simple pack supports zoomies and circles. Prancing needs a complete **pet-v2** pack with authored jumping poses. Loki, Beagle, and Whippet have them; Loki Vampire currently runs and circles. Choose an individual pet-v2 dog to prance, since the whole pack now includes the vampire.
 
